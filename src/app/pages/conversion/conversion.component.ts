@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { LucideAngularModule , Image, Sheet , MoveRight } from 'lucide-angular';
+import { LucideAngularModule , Image, Sheet , MoveRight , FileText , File } from 'lucide-angular';
 
 @Component({
   selector: 'app-conversion',
@@ -11,4 +11,6 @@ export class ConversionComponent {
   readonly ImageIcon = Image;
   readonly SheetIcon = Sheet;
   readonly RightIcon = MoveRight;
+  readonly DocsIcon = FileText;
+  readonly PDFIcon = File;
 }

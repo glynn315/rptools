@@ -1,6 +1,11 @@
 button{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     width: 20%;
-    height: 100px;
+    height: 200px;
+    font-size:20px;
+    font-weight: 700;
     transition: .1s;
     &:hover{
         scale:1.04;

@@ -1,34 +1,29 @@
-<div class="flexrow w-full h-dvh justify-center">
-    <button class="bg-secondary p-4 w-50 flexcol rounded-xl">
-        <div class="flexrow !justify-between w-[70%]">
-            <lucide-icon [img]="ImageIcon"></lucide-icon>
-            <lucide-icon [img]="RightIcon"></lucide-icon>
-            <lucide-icon [img]="SheetIcon"></lucide-icon>
-        </div>
-        <span>Image to Sheet</span>
-    </button>
-    <button class="bg-secondary p-4 w-50 flexcol rounded-xl">
-        <div class="flexrow !justify-between w-[70%]">
-            <lucide-icon [img]="ImageIcon"></lucide-icon>
-            <lucide-icon [img]="RightIcon"></lucide-icon>
-            <lucide-icon [img]="SheetIcon"></lucide-icon>
-        </div>
-        <span>Image to Sheet</span>
-    </button>
-    <button class="bg-secondary p-4 w-50 flexcol rounded-xl">
-        <div class="flexrow !justify-between w-[70%]">
-            <lucide-icon [img]="ImageIcon"></lucide-icon>
-            <lucide-icon [img]="RightIcon"></lucide-icon>
-            <lucide-icon [img]="SheetIcon"></lucide-icon>
-        </div>
-        <span>Image to Sheet</span>
-    </button>
-    <button class="bg-secondary p-4 w-50 flexcol rounded-xl">
-        <div class="flexrow !justify-between w-[70%]">
-            <lucide-icon [img]="ImageIcon"></lucide-icon>
-            <lucide-icon [img]="RightIcon"></lucide-icon>
-            <lucide-icon [img]="SheetIcon"></lucide-icon>
-        </div>
-        <span>Image to Sheet</span>
-    </button>
+<div class="flexcol w-full h-full justify-center">
+    <header class="text-6xl font-bold absolute top-60">Please Select Conversion Type</header>
+    <div class="flexrow !justify-center !gap-5 w-full">
+        <button class="bg-secondary p-4 w-50 flexcol rounded-xl">
+            <div class="flexrow !justify-center w-[70%]">
+                <lucide-icon [img]="ImageIcon" size="35px"></lucide-icon>
+                <lucide-icon [img]="RightIcon" size="35px"></lucide-icon>
+                <lucide-icon [img]="SheetIcon" size="35px"></lucide-icon>
+            </div>
+            <span>Image to Sheet</span>
+        </button>
+        <button class="bg-secondary p-4 w-50 flexcol rounded-xl">
+            <div class="flexrow !justify-center w-[70%]">
+                <lucide-icon [img]="ImageIcon" size="35px"></lucide-icon>
+                <lucide-icon [img]="RightIcon" size="35px"></lucide-icon>
+                <lucide-icon [img]="DocsIcon" size="35px"></lucide-icon>
+            </div>
+            <span>Image to Documents</span>
+        </button>
+        <button class="bg-secondary p-4 w-50 flexcol rounded-xl">
+            <div class="flexrow !justify-center w-[70%]">
+                <lucide-icon [img]="PDFIcon" size="35px"></lucide-icon>
+                <lucide-icon [img]="RightIcon" size="35px"></lucide-icon>
+                <lucide-icon [img]="SheetIcon" size="35px"></lucide-icon>
+            </div>
+            <span>PDF to Docx</span>
+        </button>
+    </div>
 </div>
