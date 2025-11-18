@@ -9,10 +9,42 @@
         <button (click)="openSheetImport()" class="bg-primary" title="Share Link"><lucide-icon [img]="UploadSheetIcon"></lucide-icon></button>
         <button (click)="openMapping()" class="bg-primary" title="Map Node"><lucide-icon [img]="SelectNodeIcon"></lucide-icon></button>
         <button (click)="refreshFromSheet()" class="bg-primary" title="Refresh"><lucide-icon [img]="RefreshIcon"></lucide-icon></button>
+        <button (click)="colorNodes()" class="bg-primary" title="Color"><lucide-icon [img]="PaletteIcon"></lucide-icon></button>
     </div>
     <div #cyContainer class="cy"></div>
 
 </div>
+
+<div *ngIf="ShowSavingModal" class="modal">
+  <div class="modal-content">
+    <form (ngSubmit)="saveDiagramsInformation()">
+      <h3>Diagrams Information</h3>
+
+      <label>Diagram Name</label>
+      <input type="text" name="name" [(ngModel)]="diagramsField.name" placeholder="Name" class="input">
+      <label>Description</label>
+      <textarea name="description" [(ngModel)]="diagramsField.description" placeholder="Name" class="input"></textarea>
+      <button class="btn">Save Diagrams Information</button>
+      <button class="btn" (click)="ShowSavingModal=false">Close</button>
+    </form>
+  </div>
+</div>
+<div *ngIf="ShowColorModal" class="modal">
+  <div class="modal-content">
+    <form (ngSubmit)="saveColorDiagramsInformation()">
+      <h3>Color Information</h3>
+
+      <label>Label</label>
+      <input type="text" name="label" [(ngModel)]="ColorNodeFields.label" placeholder="Name" class="input">
+      <label>color</label>
+      <input type="color" name="color_code" [(ngModel)]="ColorNodeFields.color_code" placeholder="Name" class="input">
+      <button class="btn">Save Diagrams Information</button>
+      <button class="btn" (click)="ShowColorModal=false">Close</button>
+    </form>
+  </div>
+</div>
+
+
 <div *ngIf="showImportModal" class="modal">
   <div class="modal-content">
     <h3>Import Google Sheet</h3>

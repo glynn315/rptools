@@ -3,16 +3,22 @@ import { FormsModule } from '@angular/forms';
 import { Component, ElementRef, ViewChild, OnInit, OnDestroy } from '@angular/core';
 import cytoscape from 'cytoscape';
 import dagre from 'cytoscape-dagre';
-import { LucideAngularModule , RefreshCcw , BetweenHorizontalStart , SquareMousePointer , Workflow , Spline , GitBranchPlus , Save , Shapes , RouteOff} from 'lucide-angular';
+import { LucideAngularModule , Palette , RefreshCcw , BetweenHorizontalStart , SquareMousePointer , Workflow , Spline , GitBranchPlus , Save , Shapes , RouteOff} from 'lucide-angular';
+import { DiagramsService } from '../../Services/diagrams.service';
+import { Diagrams } from '../../Models/Diagrams/diagrams.model';
+import { HttpClientModule } from '@angular/common/http';
+import { ColornodesService } from '../../Services/ColorNodes/colornodes.service';
+import { ColorNodes } from '../../Models/ColorNodes/color-nodes.model';
 
 
 (cytoscape as any).use(dagre);
 
 @Component({
   selector: 'app-diagram',
-  imports: [LucideAngularModule , CommonModule, FormsModule],
+  imports: [LucideAngularModule , CommonModule, FormsModule , HttpClientModule],
   templateUrl: './diagrams.component.html',
-  styleUrls: ['./diagrams.component.scss']
+  styleUrls: ['./diagrams.component.scss'],
+  providers:[DiagramsService , ColornodesService]
 })
 export class DiagramComponent implements OnInit, OnDestroy {
   readonly WorkflowIcon = Workflow;
@@ -20,6 +26,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
   readonly GitBranchPlusIcon = GitBranchPlus;
   readonly SaveIcon = Save;
   readonly ShapesIcon = Shapes;
+  readonly PaletteIcon = Palette;
   readonly RouteOffIcon = RouteOff;
   readonly RefreshIcon = RefreshCcw;
   readonly UploadSheetIcon = BetweenHorizontalStart;
@@ -28,10 +35,28 @@ export class DiagramComponent implements OnInit, OnDestroy {
   selectedFileId: string = '';
   showImportModal = false;
   showMappingModal = false;
+  ShowSavingModal = false;
+  ShowColorModal = false;
 
   sheetUrl = '';
   sheetColumns: string[][] = [];
   selectedImportColumn = 0;
+
+  diagramsField: Diagrams ={
+    name: '',
+    description: '',
+    json_data: '',
+    s_bpartner_i_employee_id: 2,
+    created_by: 2,
+  }
+  ColorNodeFields: ColorNodes = {
+    diagram_id: null,
+    label: '',
+    color_key: '',
+    color_code: '',
+    created_by: 2,
+  }
+  diagramID: any;
 
   selectedNodeId = '';
   selectedMapColumn = 0;
@@ -40,6 +65,8 @@ export class DiagramComponent implements OnInit, OnDestroy {
   connectMode = false;
   selectedNode: any = null;
   nodeIndex = 1;
+
+  constructor(private DiagramsServices: DiagramsService , private ColorServices : ColornodesService){}
 
   ngOnInit() {}
 
@@ -125,10 +152,21 @@ export class DiagramComponent implements OnInit, OnDestroy {
     this.cy.layout({ name: 'dagre' }).run();
   }
 
-  saveLocal() {
+  saveLocal(){
+    this.ShowSavingModal = true;
+  }
+
+  saveDiagramsInformation() {
     const json = this.cy.json();
     localStorage.setItem('diagram', JSON.stringify(json));
-    alert('Saved to localStorage!');
+    this.diagramsField.json_data = JSON.stringify(json);
+    this.DiagramsServices.storeDiagrams(this.diagramsField).subscribe((diagram:any)=>{
+      this.diagramID = diagram[1].id;
+      debugger;
+      console.log(this.diagramID);
+      
+    });
+    alert('Diagrams Added');
   }
 
   loadLocal() {
@@ -145,6 +183,17 @@ export class DiagramComponent implements OnInit, OnDestroy {
 
     this.cy.json(json);
     alert('Diagram loaded from localStorage!');
+  }
+  colorNodes(){
+    this.ShowColorModal = true;
+  }
+
+  saveColorDiagramsInformation(){
+    this.ColorNodeFields.diagram_id = this.diagramID;
+    this.ColorNodeFields.color_key = this.ColorNodeFields.color_code;
+    this.ColorServices.storeDiagramsColorNodes(this.ColorNodeFields).subscribe(() => {
+
+    })
   }
 
   clearLocal() {
