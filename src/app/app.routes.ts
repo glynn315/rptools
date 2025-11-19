@@ -9,11 +9,12 @@ export const routes: Routes = [
     {path:'' , redirectTo:'home' , pathMatch:'full'},
     {path: 'home' , component:LayoutComponent ,
         children: [
-            {path: 'diagramsDisplay', component: DiagramComponent},
-            {path: 'diagrams', component: DiagramComponent},
+            {path: 'diagramsDisplay', component: DiagramslistComponent},
+            {path: 'diagrams', component: DiagramslistComponent},
+            {path: 'displayDiagram/:id', component: DiagramComponent},
             {path: 'conversion', component: ConversionComponent},
             {path: 'documents', component: DocumentsComponent},
-            {path: 'notes', component: DiagramComponent},
+            {path: 'notes', component: DiagramslistComponent},
         ]
     }
 ];

@@ -18,4 +18,7 @@ export class DiagramsService {
   storeDiagrams(post: Diagrams): Observable<Diagrams>{
     return this.http.post<Diagrams>(`${this.apiUrl}/store`, post);
   }
+  updateDiagrams(post: Diagrams , id: number): Observable<Diagrams>{
+    return this.http.put<Diagrams>(`${this.apiUrl}/update/${id}`, post);
+  }
 }

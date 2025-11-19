@@ -1,20 +1,19 @@
 <div class="flexrow h-full !items-start">
-    <div class="toolbar flexcol">
-        <button (click)="addNode()" class="bg-primary" title="Add Node"><lucide-icon [img]="WorkflowIcon"></lucide-icon></button>
-        <button (click)="enableConnect()" class="bg-primary" title="Connect"><lucide-icon [img]="SplineIcon"></lucide-icon></button>
-        <button (click)="layout()" class="bg-primary" title="Auto Layout"><lucide-icon [img]="GitBranchPlusIcon"></lucide-icon></button>
-        <button (click)="saveLocal()" class="bg-primary" title="Save"><lucide-icon [img]="SaveIcon"></lucide-icon></button>
-        <button (click)="loadLocal()" class="bg-primary" title="Load Existing"><lucide-icon [img]="ShapesIcon"></lucide-icon></button>
-        <button (click)="clearLocal()" class="bg-primary" title="Clear Local"><lucide-icon [img]="RouteOffIcon"></lucide-icon></button>
-        <button (click)="openSheetImport()" class="bg-primary" title="Share Link"><lucide-icon [img]="UploadSheetIcon"></lucide-icon></button>
-        <button (click)="openMapping()" class="bg-primary" title="Map Node"><lucide-icon [img]="SelectNodeIcon"></lucide-icon></button>
-        <button (click)="refreshFromSheet()" class="bg-primary" title="Refresh"><lucide-icon [img]="RefreshIcon"></lucide-icon></button>
-        <button (click)="colorNodes()" class="bg-primary" title="Color"><lucide-icon [img]="PaletteIcon"></lucide-icon></button>
-    </div>
-    <div #cyContainer class="cy"></div>
+  <div class="toolbar flexcol">
+    <button (click)="addNode()" class="bg-primary" title="Add Node"><lucide-icon [img]="WorkflowIcon"></lucide-icon></button>
+    <button (click)="enableConnect()" class="bg-primary" title="Connect"><lucide-icon [img]="SplineIcon"></lucide-icon></button>
+    <button (click)="layout()" class="bg-primary" title="Auto Layout"><lucide-icon [img]="GitBranchPlusIcon"></lucide-icon></button>
+    <button (click)="saveLocal()" class="bg-primary" title="Save"><lucide-icon [img]="SaveIcon"></lucide-icon></button>
+    <button (click)="loadLocal()" class="bg-primary" title="Load Existing"><lucide-icon [img]="ShapesIcon"></lucide-icon></button>
+    <button (click)="clearLocal()" class="bg-primary" title="Clear Local"><lucide-icon [img]="RouteOffIcon"></lucide-icon></button>
+    <button (click)="openSheetImport()" class="bg-primary" title="Share Link"><lucide-icon [img]="UploadSheetIcon"></lucide-icon></button>
+    <button (click)="openMapping()" class="bg-primary" title="Map Node"><lucide-icon [img]="SelectNodeIcon"></lucide-icon></button>
+    <button (click)="refreshFromSheet()" class="bg-primary" title="Refresh"><lucide-icon [img]="RefreshIcon"></lucide-icon></button>
+    <button (click)="colorNodes()" class="bg-primary" title="Color"><lucide-icon [img]="PaletteIcon"></lucide-icon></button>
+  </div>
 
+  <div #cyContainer class="cy"></div>
 </div>
-
 <div *ngIf="ShowSavingModal" class="modal">
   <div class="modal-content">
     <form (ngSubmit)="saveDiagramsInformation()">
@@ -23,9 +22,9 @@
       <label>Diagram Name</label>
       <input type="text" name="name" [(ngModel)]="diagramsField.name" placeholder="Name" class="input">
       <label>Description</label>
-      <textarea name="description" [(ngModel)]="diagramsField.description" placeholder="Name" class="input"></textarea>
-      <button class="btn">Save Diagrams Information</button>
-      <button class="btn" (click)="ShowSavingModal=false">Close</button>
+      <textarea name="description" [(ngModel)]="diagramsField.description" placeholder="Description" class="input"></textarea>
+      <button class="btn" type="submit">Save Diagrams Information</button>
+      <button class="btn" type="button" (click)="ShowSavingModal=false">Close</button>
     </form>
   </div>
 </div>
@@ -35,16 +34,14 @@
       <h3>Color Information</h3>
 
       <label>Label</label>
-      <input type="text" name="label" [(ngModel)]="ColorNodeFields.label" placeholder="Name" class="input">
+      <input type="text" name="label" [(ngModel)]="ColorNodeFields.label" placeholder="Label" class="input">
       <label>color</label>
-      <input type="color" name="color_code" [(ngModel)]="ColorNodeFields.color_code" placeholder="Name" class="input">
-      <button class="btn">Save Diagrams Information</button>
-      <button class="btn" (click)="ShowColorModal=false">Close</button>
+      <input type="color" name="color_code" [(ngModel)]="ColorNodeFields.color_code" class="input">
+      <button class="btn" type="submit">Save Color</button>
+      <button class="btn" type="button" (click)="ShowColorModal=false">Close</button>
     </form>
   </div>
 </div>
-
-
 <div *ngIf="showImportModal" class="modal">
   <div class="modal-content">
     <h3>Import Google Sheet</h3>
@@ -68,9 +65,6 @@
     <button class="btn" (click)="showImportModal=false">Close</button>
   </div>
 </div>
-
-
-<!-- MAPPING MODAL -->
 <div *ngIf="showMappingModal" class="modal">
   <div class="modal-content">
     <h3>Map Sheet Cell → Node</h3>
@@ -104,6 +98,26 @@
 
       <button class="btn" (click)="applyMapping()">Apply</button>
       <button class="btn" (click)="showMappingModal=false">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ACCORDION / DETAILS MODAL (opens when clicking node) -->
+<div *ngIf="showAccordion" class="modal-details">
+  <div class="modal-content details-content">
+    <h3>{{ accordionData?.name || accordionData?.id }}</h3>
+
+    <div class="accordion">
+      <div class="accordion-row"><strong>Project ID:</strong> {{ accordionData?.id }}</div>
+      <div class="accordion-row"><strong>Project Name:</strong> {{ accordionData?.name }}</div>
+      <div class="accordion-row"><strong>Start Date:</strong> {{ accordionData?.start }}</div>
+      <div class="accordion-row"><strong>End Date:</strong> {{ accordionData?.end }}</div>
+      <div class="accordion-row"><strong>S.E:</strong> {{ accordionData?.se }}</div>
+      <div class="accordion-row"><strong>Dependency:</strong> {{ accordionData?.dep }}</div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn" (click)="showAccordion = false">Close</button>
     </div>
   </div>
 </div>
