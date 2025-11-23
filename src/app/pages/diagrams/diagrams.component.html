@@ -1,19 +1,47 @@
-<div class="flexrow h-full !items-start">
-  <div class="toolbar flexcol">
-    <button (click)="addNode()" class="bg-primary" title="Add Node"><lucide-icon [img]="WorkflowIcon"></lucide-icon></button>
-    <button (click)="enableConnect()" class="bg-primary" title="Connect"><lucide-icon [img]="SplineIcon"></lucide-icon></button>
-    <button (click)="layout()" class="bg-primary" title="Auto Layout"><lucide-icon [img]="GitBranchPlusIcon"></lucide-icon></button>
-    <button (click)="saveLocal()" class="bg-primary" title="Save"><lucide-icon [img]="SaveIcon"></lucide-icon></button>
-    <button (click)="loadLocal()" class="bg-primary" title="Load Existing"><lucide-icon [img]="ShapesIcon"></lucide-icon></button>
-    <button (click)="clearLocal()" class="bg-primary" title="Clear Local"><lucide-icon [img]="RouteOffIcon"></lucide-icon></button>
-    <button (click)="openSheetImport()" class="bg-primary" title="Share Link"><lucide-icon [img]="UploadSheetIcon"></lucide-icon></button>
-    <button (click)="openMapping()" class="bg-primary" title="Map Node"><lucide-icon [img]="SelectNodeIcon"></lucide-icon></button>
-    <button (click)="refreshFromSheet()" class="bg-primary" title="Refresh"><lucide-icon [img]="RefreshIcon"></lucide-icon></button>
-    <button (click)="colorNodes()" class="bg-primary" title="Color"><lucide-icon [img]="PaletteIcon"></lucide-icon></button>
+<div class="flexcol h-full !items-start">
+  <div class="toolbar flexrow">
+    <button (click)="addNode()" class="bg-primary" title="Add Node">
+      <lucide-icon [img]="WorkflowIcon"></lucide-icon> Add Nodes
+    </button>
+    <select [(ngModel)]="connectionStyle" (change)="applyConnectionStyle()" class="bg-primary input mt-2 text-white p-2">
+      <option value="straight">Straight</option>
+      <option value="curve">Curve</option>
+      <option value="angle">Angle</option>
+    </select>
+
+    <button (click)="enableConnect()" class="bg-primary" title="Connect">
+      <lucide-icon [img]="SplineIcon"></lucide-icon> Connect Nodes
+    </button>
+
+    <button (click)="layout()" class="bg-primary" title="Auto Layout">
+      <lucide-icon [img]="GitBranchPlusIcon"></lucide-icon> Auto Layout
+    </button>
+
+    <button (click)="saveLocal()" class="bg-primary" title="Save">
+      <lucide-icon [img]="SaveIcon"></lucide-icon> Save Diagrams
+    </button>
+
+    <button (click)="openSheetImport()" class="bg-primary" title="Import Sheet">
+      <lucide-icon [img]="UploadSheetIcon"></lucide-icon> Upload G-Sheet
+    </button>
+
+    <button (click)="showMappingModal = true" class="bg-primary" title="Map Columns">
+      <lucide-icon [img]="SelectNodeIcon"></lucide-icon> Map Columns
+    </button>
+
+    <button (click)="colorNodes()" class="bg-primary" title="Color">
+      <lucide-icon [img]="PaletteIcon"></lucide-icon> Color Nodes
+    </button>
+
+    <button (click)="refreshFromSheet()" class="bg-primary" title="Re-layout">
+      <lucide-icon [img]="RefreshIcon"></lucide-icon> Refresh Data
+    </button>
   </div>
 
-  <div #cyContainer class="cy"></div>
+  <div #cyContainer class="cy border"></div>
 </div>
+
+<!-- SAVE DIAGRAMS MODAL -->
 <div *ngIf="ShowSavingModal" class="modal">
   <div class="modal-content">
     <form (ngSubmit)="saveDiagramsInformation()">
@@ -21,13 +49,19 @@
 
       <label>Diagram Name</label>
       <input type="text" name="name" [(ngModel)]="diagramsField.name" placeholder="Name" class="input">
+
       <label>Description</label>
       <textarea name="description" [(ngModel)]="diagramsField.description" placeholder="Description" class="input"></textarea>
-      <button class="btn" type="submit">Save Diagrams Information</button>
-      <button class="btn" type="button" (click)="ShowSavingModal=false">Close</button>
+
+      <div class="modal-actions">
+        <button class="btn" type="submit">Save Diagrams Information</button>
+        <button class="btn" type="button" (click)="ShowSavingModal = false">Close</button>
+      </div>
     </form>
   </div>
 </div>
+
+<!-- COLOR NODES MODAL -->
 <div *ngIf="ShowColorModal" class="modal">
   <div class="modal-content">
     <form (ngSubmit)="saveColorDiagramsInformation()">
@@ -35,10 +69,14 @@
 
       <label>Label</label>
       <input type="text" name="label" [(ngModel)]="ColorNodeFields.label" placeholder="Label" class="input">
-      <label>color</label>
+
+      <label>Color</label>
       <input type="color" name="color_code" [(ngModel)]="ColorNodeFields.color_code" class="input">
-      <button class="btn" type="submit">Save Color</button>
-      <button class="btn" type="button" (click)="ShowColorModal=false">Close</button>
+
+      <div class="modal-actions">
+        <button class="btn" type="submit">Save Color</button>
+        <button class="btn" type="button" (click)="ShowColorModal = false">Close</button>
+      </div>
     </form>
   </div>
 </div>
@@ -49,61 +87,89 @@
     <label>Google Sheet URL:</label>
     <input [(ngModel)]="sheetUrl" placeholder="Paste Google Sheet link here" class="input">
 
-    <button class="btn" (click)="loadSheet()">Load Sheet</button>
-
-    <div *ngIf="sheetColumns.length > 0">
-      <label>Select Column to Import as Nodes:</label>
-      <select [(ngModel)]="selectedImportColumn" class="input">
-        <option *ngFor="let col of sheetColumns; let i = index" [value]="i">
-          Column {{ i + 1 }}
-        </option>
-      </select>
-
-      <button class="btn" (click)="importNodesFromColumn()">Import Column as Nodes</button>
+    <div class="modal-actions">
+      <button class="btn" (click)="loadSheet()">Load Sheet</button>
+      <button class="btn" (click)="showImportModal = false">Close</button>
     </div>
 
-    <button class="btn" (click)="showImportModal=false">Close</button>
+    <div *ngIf="headers.length">
+      <h4>Detected Headers</h4>
+      <ul class="small-list">
+        <li *ngFor="let h of headers; let i = index">Column {{ i + 1 }} — {{ h || 'Column ' + (i+1) }}</li>
+      </ul>
+      <p class="muted">After loading the sheet you can map which columns represent ID, Label, and Dependency.</p>
+    </div>
   </div>
 </div>
+
+<!-- MAPPING MODAL (dynamic mapping) -->
 <div *ngIf="showMappingModal" class="modal">
   <div class="modal-content">
-    <h3>Map Sheet Cell → Node</h3>
+    <h3>Map Columns → Node</h3>
 
-    <div *ngIf="sheetColumns.length == 0">
-      <p>No sheet loaded yet. Please import a Google Sheet first.</p>
-      <button class="btn" (click)="showMappingModal=false">Close</button>
+    <div *ngIf="!headers?.length">
+      <p>No sheet loaded yet. Click <strong>Import Sheet</strong> and load a Google Sheet first.</p>
+      <div class="modal-actions">
+        <button class="btn" (click)="showMappingModal = false">Close</button>
+      </div>
     </div>
 
-    <div *ngIf="sheetColumns.length > 0">
-      <label>Select Node:</label>
-      <select [(ngModel)]="selectedNodeId" class="input">
-        <option *ngFor="let node of cy?.nodes()" [value]="node.id()">
-          {{ node.id() }} — {{ node.data('label') }}
-        </option>
+    <div *ngIf="headers?.length">
+      <label>Node ID column</label>
+      <select [(ngModel)]="mapping.id" class="input">
+        <option *ngFor="let h of headers; let i = index" [value]="i">{{ h || 'Column ' + (i+1) }}</option>
       </select>
 
-      <label>Select Sheet Column:</label>
-      <select [(ngModel)]="selectedMapColumn" class="input">
-        <option *ngFor="let col of sheetColumns; let i=index" [value]="i">
-          Column {{ i + 1 }}
-        </option>
+      <label>Label column</label>
+      <select [(ngModel)]="mapping.label" class="input">
+        <option *ngFor="let h of headers; let i = index" [value]="i">{{ h || 'Column ' + (i+1) }}</option>
       </select>
 
-      <label>Select Sheet Row:</label>
-      <select [(ngModel)]="selectedMapRow" class="input">
-        <option *ngFor="let row of sheetColumns[0]; let r=index" [value]="r">
-          Row {{ r + 1 }}
-        </option>
-      </select>
+      <label>Does this file include dependencies?</label>
+      <div class="row">
+        <label class="inline">
+          <input type="radio" name="hasDep" [checked]="mapping.dependency !== null" (click)="mapping.dependency = null; mapping.dependency = null; mapping.dependency = null;"/>
+          No
+        </label>
+        <label class="inline">
+          <input type="radio" name="hasDep" [checked]="mapping.dependency !== null" (click)="mapping.dependency =  (headers.length > 0 ? 0 : null)"/>
+          Yes
+        </label>
+      </div>
 
-      <button class="btn" (click)="applyMapping()">Apply</button>
-      <button class="btn" (click)="showMappingModal=false">Close</button>
+      <div *ngIf="mapping.dependency !== null">
+        <label>Dependency column (comma separated values expected)</label>
+        <select [(ngModel)]="mapping.dependency" class="input">
+          <option *ngFor="let h of headers; let i = index" [value]="i">{{ h || 'Column ' + (i+1) }}</option>
+        </select>
+      </div>
+
+      <div class="preview">
+        <h4>Sample rows (first 5)</h4>
+        <table class="table small">
+          <thead>
+            <tr>
+              <th *ngFor="let h of headers">{{ h || '-' }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let r of rows | slice:0:5">
+              <td *ngFor="let c of r.c">{{ c?.v || '' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn" (click)="generateNodesDynamic(); showMappingModal = false">Generate Nodes</button>
+        <button class="btn" (click)="showMappingModal = false">Close</button>
+      </div>
     </div>
   </div>
 </div>
 
-<!-- ACCORDION / DETAILS MODAL (opens when clicking node) -->
-<div *ngIf="showAccordion" class="modal-details">
+<!-- NODE DETAILS ACCORDION (when clicking node) -->
+<!-- <div *ngIf="showAccordion" class="modal-details">
   <div class="modal-content details-content">
     <h3>{{ accordionData?.name || accordionData?.id }}</h3>
 
@@ -112,7 +178,8 @@
       <div class="accordion-row"><strong>Project Name:</strong> {{ accordionData?.name }}</div>
       <div class="accordion-row"><strong>Start Date:</strong> {{ accordionData?.start }}</div>
       <div class="accordion-row"><strong>End Date:</strong> {{ accordionData?.end }}</div>
-      <div class="accordion-row"><strong>S.E:</strong> {{ accordionData?.se }}</div>
+      <div class="accordion-row"><strong>As:</strong> {{ accordionData?.as }}</div>
+      <div class="accordion-row"><strong>Ae:</strong> {{ accordionData?.ae }}</div>
       <div class="accordion-row"><strong>Dependency:</strong> {{ accordionData?.dep }}</div>
     </div>
 
@@ -120,4 +187,4 @@
       <button class="btn" (click)="showAccordion = false">Close</button>
     </div>
   </div>
-</div>
+</div> -->

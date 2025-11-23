@@ -3,31 +3,26 @@ import { FormsModule } from '@angular/forms';
 import { Component, ElementRef, ViewChild, OnInit, OnDestroy, AfterViewInit } from '@angular/core';
 import cytoscape from 'cytoscape';
 import dagre from 'cytoscape-dagre';
-import { LucideAngularModule , Palette , RefreshCcw , BetweenHorizontalStart , SquareMousePointer , Workflow , Spline , GitBranchPlus , Save , Shapes , RouteOff} from 'lucide-angular';
+import { LucideAngularModule, Workflow, Spline, GitBranchPlus, Save, Shapes, RouteOff, Palette, BetweenHorizontalStart, SquareMousePointer, RefreshCcw } from 'lucide-angular';
 import { DiagramsService } from '../../Services/diagrams.service';
-import { Diagrams } from '../../Models/Diagrams/diagrams.model';
-import { HttpClientModule } from '@angular/common/http';
 import { ColornodesService } from '../../Services/ColorNodes/colornodes.service';
+import { Diagrams } from '../../Models/Diagrams/diagrams.model';
 import { ColorNodes } from '../../Models/ColorNodes/color-nodes.model';
+import { HttpClientModule } from '@angular/common/http';
 import { ActivatedRoute } from '@angular/router';
 
 (cytoscape as any).use(dagre);
 
-interface ProjectRow {
-  id: string;
-  name: string;
-  start: string;
-  end: string;
-  se: string;
-  dep: string; // can be empty or comma-separated list of project ids
+interface DynamicRow {
+  [key: string]: string;
 }
 
 @Component({
   selector: 'app-diagram',
-  imports: [LucideAngularModule , CommonModule, FormsModule , HttpClientModule],
+  imports: [LucideAngularModule, CommonModule, FormsModule, HttpClientModule],
   templateUrl: './diagrams.component.html',
   styleUrls: ['./diagrams.component.scss'],
-  providers:[DiagramsService , ColornodesService]
+  providers: [DiagramsService, ColornodesService]
 })
 export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly WorkflowIcon = Workflow;
@@ -35,59 +30,64 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly GitBranchPlusIcon = GitBranchPlus;
   readonly SaveIcon = Save;
   readonly ShapesIcon = Shapes;
-  readonly PaletteIcon = Palette;
   readonly RouteOffIcon = RouteOff;
-  readonly RefreshIcon = RefreshCcw;
+  readonly PaletteIcon = Palette;
   readonly UploadSheetIcon = BetweenHorizontalStart;
   readonly SelectNodeIcon = SquareMousePointer;
+  readonly RefreshIcon = RefreshCcw;
 
   @ViewChild('cyContainer') cyContainer!: ElementRef;
-  selectedFileId: string = '';
+
+  cy: any;
+  nodeIndex = 1;
+  connectMode = false;
+  selectedNode: any = null;
+  connectionStyle: 'straight' | 'curve' | 'angle' = 'straight';
+  pendingSource: string | null = null;
+
+
+  // Modal controls
   showImportModal = false;
-  showMappingModal = false;
   ShowSavingModal = false;
   ShowColorModal = false;
+  showMappingModal = false;
 
+  // Sheet data
   sheetUrl = '';
-  sheetColumns: string[][] = [];
-  selectedImportColumn = 0;
+  headers: string[] = [];
+  rows: any[] = [];
+  mapping = { id: 0, label: 1, dependency: null as number | null };
 
-  diagramsField: Diagrams ={
+  // Database fields
+  diagramsField: Diagrams = {
     name: '',
     description: '',
     json_data: '',
     sheet_url: '',
     s_bpartner_i_employee_id: 2,
-    created_by: 2,
-  }
+    created_by: 2
+  };
+
   ColorNodeFields: ColorNodes = {
     diagram_id: null,
     label: '',
     color_key: '',
     color_code: '',
     created_by: 2,
-  }
-  diagramID: null | any;
+  };
 
-  selectedNodeId = '';
-  selectedMapColumn = 0;
-  selectedMapRow = 0;
-  cy: any;
-  connectMode = false;
-  selectedNode: any = null;
-  nodeIndex = 1;
-  fetchDiagramID: number | null = null;
+  diagramID: number | null = null;
 
-  projects: ProjectRow[] = [];
-  showAccordion = false;
-  accordionData: ProjectRow | null = null;
-
-  constructor(private DiagramsServices: DiagramsService , private ColorServices : ColornodesService , private ActRouter : ActivatedRoute){}
+  constructor(
+    private DiagramService: DiagramsService,
+    private ColorService: ColornodesService,
+    private route: ActivatedRoute
+  ) {}
 
   ngOnInit() {
-    this.fetchDiagramID = this.ActRouter.snapshot.params['id'];
-    this.diagramID = this.ActRouter.snapshot.params['id'];
-    if (this.fetchDiagramID) {
+    this.diagramID = this.route.snapshot.params['id'];
+
+    if (this.diagramID) {
       this.fetchDiagramByID();
     }
   }
@@ -107,11 +107,11 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
             label: 'data(label)',
             'text-valign': 'center',
             'text-halign': 'center',
-            'shape': 'round-rectangle',
-            'padding': '10px',
+            shape: 'round-rectangle',
+            padding: '10px',
             'background-color': '#90caf9',
             'border-color': '#0d47a1',
-            'width': '200px',
+            width: '200px',
             'border-width': 1,
             'text-wrap': 'wrap',
             'font-size': 12
@@ -136,9 +136,12 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         }
       ]
     });
+
+    // Node click
     this.cy.on('tap', 'node', (evt: any) => {
-      const node = evt.target;
       if (this.connectMode) {
+        const node = evt.target;
+
         if (this.selectedNode && this.selectedNode.id() !== node.id()) {
           this.cy.add({
             group: 'edges',
@@ -148,70 +151,115 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
               target: node.id()
             }
           });
-          this.connectMode = false;
           this.selectedNode = null;
+          this.connectMode = false;
         } else {
           this.selectedNode = node;
         }
         return;
       }
 
-      const details = node.data('details') as ProjectRow | undefined;
-      if (details) {
-        this.accordionData = details;
-        this.showAccordion = true;
-      } else {
-        const newLabel = prompt('Edit Label:', node.data('label'));
-        if (newLabel !== null) node.data('label', newLabel);
-      }
+      const node = evt.target;
+      const newLabel = prompt('Edit Label:', node.data('label'));
+      if (newLabel !== null) node.data('label', newLabel);
     });
+
+    // Right click delete node
     this.cy.on('cxttap', 'node', (evt: any) => {
       const node = evt.target;
-
       if (confirm(`Delete node "${node.data('label')}"?`)) {
         this.cy.remove(node);
       }
     });
+
+    // Right click delete edge
     this.cy.on('cxttap', 'edge', (evt: any) => {
       const edge = evt.target;
-
-      if (confirm("Delete this connection?")) {
+      if (confirm('Delete connection?')) {
         this.cy.remove(edge);
       }
     });
+    this.cy.on('tap', 'node', (evt: any) => {
+      const nodeId = evt.target.id();
+
+      // Connecting two nodes
+      if (this.connectMode) {
+        if (!this.pendingSource) {
+          this.pendingSource = nodeId;
+        } else {
+          this.addConnection(this.pendingSource, nodeId);
+          this.pendingSource = null;
+          this.connectMode = false;
+        }
+        return;
+      }
+
+      // Normal click → rename
+      const node = evt.target;
+      const newLabel = prompt('Edit Label:', node.data('label'));
+      if (newLabel !== null) node.data('label', newLabel);
+    });
+
   }
 
+  // -----------------------------
+  // Toolbar Actions
+  // -----------------------------
+
+
+  
   addNode() {
     const id = 'n' + this.nodeIndex++;
     this.cy.add({
       group: 'nodes',
-      data: { id, label: 'Click to Edit '},
-      position: {
-        x: 200 + Math.random() * 100,
-        y: 100 + Math.random() * 100
-      }
+      data: { id, label: 'New Node' },
+      position: { x: 200 + Math.random() * 150, y: 150 + Math.random() * 150 }
     });
   }
-  removeNode() {
-    if (!this.selectedNode) {
-      alert("No node selected.");
-      return;
+  applyConnectionStyle() {
+    if (!this.cy) return;
+
+    switch (this.connectionStyle) {
+      case 'straight':
+        this.cy.edges().style({
+          'curve-style': 'straight'
+        });
+        break;
+
+      case 'curve':
+        this.cy.edges().style({
+          'curve-style': 'bezier',
+          'control-point-step-size': 40
+        });
+        break;
+
+      case 'angle':
+        this.cy.edges().style({
+          'curve-style': 'taxi',
+          'taxi-direction': 'auto',
+          'taxi-turn': 20
+        });
+        break;
     }
 
-    this.cy.remove(this.selectedNode);
-    this.selectedNode = null;
+    this.cy.layout({ name: 'preset' }).run();
   }
-  removeEdge(edgeId: string) {
-    const edge = this.cy.getElementById(edgeId);
-
-    if (!edge.length) {
-      alert("Edge not found.");
-      return;
-    }
-
-    this.cy.remove(edge);
+  getConnectionStyle() {
+    if (this.connectionStyle === 'straight') return { 'curve-style': 'straight' };
+    if (this.connectionStyle === 'curve') return { 'curve-style': 'bezier', 'control-point-step-size': 40 };
+    return { 'curve-style': 'taxi', 'taxi-direction': 'auto', 'taxi-turn': 20 };
   }
-
+  addConnection(source: string, target: string) {
+    this.cy.add({
+      group: "edges",
+      data: {
+        id: `edge-${source}-${target}`,
+        source: source,
+        target: target
+      },
+      style: this.getConnectionStyle()
+    });
+  }
 
   enableConnect() {
     this.connectMode = true;
@@ -220,86 +268,74 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
 
   layout() {
     try {
-      this.cy.layout({ name: 'dagre', rankDir: 'TB', nodeSep: 50, edgeSep: 10 }).run();
+      this.cy.layout({ name: 'dagre', rankDir: 'TB', nodeSep: 50 }).run();
     } catch (err) {
-      console.warn('layout error', err);
+      console.warn('Layout error', err);
     }
   }
 
-  saveLocal(){
+  saveLocal() {
     this.ShowSavingModal = true;
   }
 
   saveDiagramsInformation() {
     const json = this.cy.json();
-    localStorage.setItem('diagram', JSON.stringify(json));
     this.diagramsField.json_data = JSON.stringify(json);
     this.diagramsField.sheet_url = this.sheetUrl;
-    if (this.diagramID == null) {
-      this.DiagramsServices.storeDiagrams(this.diagramsField).subscribe((diagram:any)=>{
-        this.diagramID = diagram.data.id
+
+    if (!this.diagramID) {
+      this.DiagramService.storeDiagrams(this.diagramsField).subscribe((res: any) => {
+        this.diagramID = res.data.id;
       });
-      alert('Diagrams Added');
+      alert('Diagram Saved');
+    } else {
+      this.DiagramService.updateDiagrams(this.diagramsField, this.diagramID).subscribe();
+      alert('Diagram Updated');
     }
-    else{
-      this.DiagramsServices.updateDiagrams(this.diagramsField , this.diagramID).subscribe((diagram:any)=>{
-        console.log('Update diagram id', this.diagramID);
-      });
-      alert('Diagrams Updates');
-    }
-  }
-    
-  loadLocal() {
-    const saved = localStorage.getItem('diagram');
-    if (!saved) {
-      alert('No saved diagram found.');
-      return;
-    }
-
-    const json = JSON.parse(saved);
-
-    this.cy.destroy();
-    this.initCytoscape();
-
-    this.cy.json(json);
-    alert('Diagram loaded from localStorage!');
-  }
-  colorNodes(){
-    this.ShowColorModal = true;
-  }
-
-  saveColorDiagramsInformation(){
-    this.ColorNodeFields.diagram_id = this.diagramID;
-    this.ColorNodeFields.color_key = this.ColorNodeFields.color_code;
-    this.ColorServices.storeDiagramsColorNodes(this.ColorNodeFields).subscribe(() => {
-    })
   }
 
   clearLocal() {
     localStorage.removeItem('diagram');
-    alert('Local storage cleared.');
+    alert('Local Storage Cleared');
   }
 
-  ngOnDestroy() {
-    if (this.cy) this.cy.destroy();
+  colorNodes() {
+    this.ShowColorModal = true;
+  }
+
+  saveColorDiagramsInformation() {
+    this.ColorNodeFields.diagram_id = this.diagramID;
+    this.ColorNodeFields.color_key = this.ColorNodeFields.color_code;
+
+    this.ColorService.storeDiagramsColorNodes(this.ColorNodeFields).subscribe(() => {
+      alert("Color Saved");
+    });
+  }
+
+  // -----------------------------
+  // Google Sheet Import
+  // -----------------------------
+
+  extractSheetID(url: string) {
+    const match = url.match(/\/d\/(.*?)\//);
+    return match ? match[1] : null;
   }
 
   openSheetImport() {
     this.showImportModal = true;
   }
 
-  openMapping() {
-    this.showMappingModal = true;
-  }
-
-  extractSheetID(url: string) {
-    const match = url.match(/\/d\/(.*?)\//);
-    return match ? match[1] : null;
-  }
   loadSheet() {
-    const sheetId = this.extractSheetID(this.sheetUrl);
+    var sheetId;
+    if (this.diagramsField.sheet_url) {
+      sheetId = this.extractSheetID(this.diagramsField.sheet_url);
+    }
+    else{
+      sheetId = this.extractSheetID(this.sheetUrl);
+    }
+
     if (!sheetId) {
-      alert("Invalid Google Sheet URL.");
+      alert('Invalid Google Sheet URL');
       return;
     }
 
@@ -307,147 +343,127 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       .then(res => res.text())
       .then(text => {
         const json = JSON.parse(text.substr(47).slice(0, -2));
-        const rows = json.table.rows;
-        this.projects = rows.map((row: any) => {
-          return {
-            id: (row.c[0]?.v ?? '').toString().trim(),
-            name: (row.c[1]?.v ?? '').toString(),
-            start: (row.c[2]?.v ?? '').toString(),
-            end: (row.c[3]?.v ?? '').toString(),
-            se: (row.c[4]?.v ?? '').toString(),
-            dep: (row.c[5]?.v ?? '').toString().trim()
-          } as ProjectRow;
-        });
-        let colCount = rows[0]?.c?.length ?? 0;
-        this.sheetColumns = Array.from({ length: colCount }, () => []);
-        rows.forEach((row: any) => {
-          row.c.forEach((cell: any, colIdx: number) => {
-            this.sheetColumns[colIdx].push(cell?.v ?? "");
-          });
-        });
-        this.generateNodesFromProjects();
 
-        alert("Sheet Loaded Successfully!");
+        // Headers
+        this.headers = json.table.cols.map((c: any) => c.label || 'Column');
+
+        // Rows
+        this.rows = json.table.rows;
+
+        this.showMappingModal = true;
       })
-      .catch(err => {
-        console.error(err);
-        alert("Failed to load sheet.");
-      });
+      .catch(() => alert('Failed to load sheet.'));
   }
-  generateNodesFromProjects() {
-    this.cy.elements().remove();
-    this.projects.forEach((p, i) => {
-      const nodeId = p.id && p.id !== '' ? p.id : `auto-${i}`;
 
+  // -----------------------------
+  // FINAL NODE GENERATION (DYNAMIC)
+  // -----------------------------
+
+  generateNodesDynamic() {
+    this.cy.elements().remove();
+
+    const data = this.rows.map((row: any, i: number) => {
+      const cells = row.c;
+
+      const id = cells[this.mapping.id]?.v?.toString().trim() || `auto-${i}`;
+      const label = cells[this.mapping.label]?.v?.toString().trim() || id;
+      const dep = this.mapping.dependency !== null
+        ? cells[this.mapping.dependency]?.v?.toString().trim()
+        : '';
+
+      return { id, label, dep };
+    });
+
+    const idSet = new Set(data.map(x => x.id));
+
+    // Create nodes
+    data.forEach((item, i) => {
       this.cy.add({
-        group: "nodes",
-        data: {
-          id: nodeId,
-          label: p.name || nodeId,
-          details: p
-        },
-        position: {
-          x: 200 + (i % 4) * 260,
-          y: 100 + Math.floor(i / 4) * 150
-        }
+        group: 'nodes',
+        data: { id: item.id, label: item.label, details: item },
+        position: { x: 200 + (i % 4) * 260, y: 120 + Math.floor(i / 4) * 150 }
       });
     });
-    const idsSet = new Set(this.projects.map(p => (p.id && p.id !== '' ? p.id : '').toString()));
-    this.projects.forEach((p, i) => {
-      if (!p.dep) return;
-      const toId = (p.id && p.id !== '') ? p.id : `auto-${i}`;
-      const deps = p.dep.split(',').map(x => x.trim()).filter(x => x !== '');
-      deps.forEach(depId => {
-        let sourceId = depId;
-        if (!idsSet.has(depId)) {
-          sourceId = `ph-${depId}`;
-          if (!this.cy.getElementById(sourceId).length) {
-            this.cy.add({
-              group: "nodes",
-              data: { id: sourceId, label: depId, details: { id: depId, name: depId, start: '', end: '', se: '', dep: '' } },
-              classes: 'placeholder',
-              position: { x: 50 + Math.random() * 100, y: 50 + Math.random() * 100 }
-            });
-          }
-        }
-        const edgeId = `e-${sourceId}-${toId}`;
-        if (!this.cy.getElementById(edgeId).length) {
+
+    // Add dependencies
+    data.forEach((item) => {
+      if (!item.dep) return;
+
+      const deps = item.dep.split(',').map((x: string) => x.trim());
+
+      deps.forEach((dep: any) => {
+        if (!idSet.has(dep)) {
           this.cy.add({
-            group: "edges",
-            data: { id: edgeId, source: sourceId, target: toId }
+            group: 'nodes',
+            classes: 'placeholder',
+            data: { id: dep, label: dep }
           });
         }
+
+        this.cy.add({
+          group: 'edges',
+          data: { id: `e-${dep}-${item.id}`, source: dep, target: item.id }
+        });
       });
     });
 
     this.layout();
   }
   refreshFromSheet() {
-    if (!this.selectedFileId) {
-      alert('No sheet loaded. Use Load Sheet first.');
+    if (!this.diagramsField.sheet_url) {
+      alert("No Google Sheet linked.");
       return;
     }
 
-    const url = this.selectedFileId + '&cb=' + Date.now();
+    this.loadSheetForRefresh();
+  } 
 
-    fetch(url)
+  loadSheetForRefresh() {
+    const sheetId = this.extractSheetID(this.diagramsField.sheet_url!);
+
+    if (!sheetId) {
+      alert("Invalid Google Sheet URL");
+      return;
+    }
+
+    fetch(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json`)
       .then(res => res.text())
       .then(text => {
         const json = JSON.parse(text.substr(47).slice(0, -2));
-        const rows = json.table.rows;
-        this.projects = rows.map((row: any) => ({
-          id: (row.c[0]?.v ?? '').toString().trim(),
-          name: (row.c[1]?.v ?? '').toString(),
-          start: (row.c[2]?.v ?? '').toString(),
-          end: (row.c[3]?.v ?? '').toString(),
-          se: (row.c[4]?.v ?? '').toString(),
-          dep: (row.c[5]?.v ?? '').toString().trim()
-        }));
 
-        this.generateNodesFromProjects();
+        const newRows = json.table.rows;
+        if (!newRows) {
+          alert("No rows found in sheet.");
+          return;
+        }
+
+        this.rows = newRows;
+        this.generateNodesDynamic();
+        alert("Diagram refreshed from Google Sheet!");
       })
-      .catch(err => console.error(err));
-  }
-
-  importNodesFromColumn() {
-    const labels = this.sheetColumns[this.selectedImportColumn] || [];
-
-    labels.forEach(text => {
-      const id = 'n' + this.nodeIndex++;
-
-      this.cy.add({
-        group: 'nodes',
-        data: { id, label: text || 'Empty' },
-        position: { x: Math.random() * 300, y: Math.random() * 300 }
+      .catch(err => {
+        console.error(err);
+        alert("Failed to refresh sheet data.");
       });
-    });
-
-    alert("Nodes created from column!");
-    this.showImportModal = false;
   }
 
-  applyMapping() {
-    const node = this.cy.getElementById(this.selectedNodeId);
-    const label = this.sheetColumns[this.selectedMapColumn][this.selectedMapRow];
 
-    node.data('label', label);
-
-    alert(`Mapped to Node ${this.selectedNodeId}: "${label}"`);
-
-    this.showMappingModal = false;
-  }
   fetchDiagramByID() {
-    this.DiagramsServices.displayDiagramsbyID(this.fetchDiagramID!).subscribe((data) => {
+    this.DiagramService.displayDiagramsbyID(this.diagramID!).subscribe((data) => {
       this.diagramsField = data;
+
       if (this.diagramsField.json_data) {
         const json = JSON.parse(this.diagramsField.json_data);
+
         setTimeout(() => {
-          if (this.cy) {
-            this.cy.json(json);
-            this.cy.fit();
-          }
+          this.cy.json(json);
+          this.cy.fit();
         }, 300);
       }
     });
+  }
+
+  ngOnDestroy() {
+    if (this.cy) this.cy.destroy();
   }
 }
