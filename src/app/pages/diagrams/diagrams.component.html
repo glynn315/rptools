@@ -143,23 +143,10 @@
           <option *ngFor="let h of headers; let i = index" [value]="i">{{ h || 'Column ' + (i+1) }}</option>
         </select>
       </div>
-
-      <div class="preview">
-        <h4>Sample rows (first 5)</h4>
-        <table class="table small">
-          <thead>
-            <tr>
-              <th *ngFor="let h of headers">{{ h || '-' }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let r of rows | slice:0:5">
-              <td *ngFor="let c of r.c">{{ c?.v || '' }}</td>
-            </tr>
-          </tbody>
-        </table>
+      <div *ngFor="let header of headers; let index = index">
+        <input type="checkbox" [(ngModel)]="selectedNodeDisplay[index]">
+        <label for="">{{header || '-'}}</label>
       </div>
-
       <div class="modal-actions">
         <button class="btn" (click)="generateNodesDynamic(); showMappingModal = false">Generate Nodes</button>
         <button class="btn" (click)="showMappingModal = false">Close</button>

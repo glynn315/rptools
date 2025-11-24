@@ -45,6 +45,7 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
   connectionStyle: 'straight' | 'curve' | 'angle' = 'straight';
   pendingSource: string | null = null;
 
+  selectedNodeDisplay: any[] = [];
 
   // Modal controls
   showImportModal = false;
@@ -52,17 +53,17 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
   ShowColorModal = false;
   showMappingModal = false;
 
-  // Sheet data
   sheetUrl = '';
   headers: string[] = [];
   rows: any[] = [];
   mapping = { id: 0, label: 1, dependency: null as number | null };
 
-  // Database fields
   diagramsField: Diagrams = {
     name: '',
     description: '',
     json_data: '',
+    line_category: '',
+    node_data: '',
     sheet_url: '',
     s_bpartner_i_employee_id: 2,
     created_by: 2
@@ -284,9 +285,11 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
     this.diagramsField.sheet_url = this.sheetUrl;
 
     if (!this.diagramID) {
+      this.diagramsField.line_category = this.connectionStyle;
       this.DiagramService.storeDiagrams(this.diagramsField).subscribe((res: any) => {
         this.diagramID = res.data.id;
       });
+      debugger;
       alert('Diagram Saved');
     } else {
       this.DiagramService.updateDiagrams(this.diagramsField, this.diagramID).subscribe();
@@ -347,6 +350,8 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         // Headers
         this.headers = json.table.cols.map((c: any) => c.label || 'Column');
 
+        this.restoreMappingFromSavedNodeData();
+
         // Rows
         this.rows = json.table.rows;
 
@@ -373,6 +378,8 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
 
       return { id, label, dep };
     });
+
+
 
     const idSet = new Set(data.map(x => x.id));
 
@@ -406,6 +413,13 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         });
       });
     });
+    const selectedHeaders = this.headers
+      .filter((_, i) => this.selectedNodeDisplay[i]) // get only checked items
+      .join(','); // convert to comma-separated string
+
+    this.diagramsField.node_data = selectedHeaders;
+
+    console.log('Saved node_data:', this.diagramsField.node_data);
 
     this.layout();
   }
@@ -458,10 +472,33 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         setTimeout(() => {
           this.cy.json(json);
           this.cy.fit();
+
+          // ✅ APPLY SAVED LINE STYLE
+          this.connectionStyle = this.diagramsField.line_category as any;
+          this.applyConnectionStyle();
         }, 300);
       }
+
+      // ✅ RESTORE selectedNodeDisplay
+      if (this.diagramsField.node_data) {
+        const savedHeaders = this.diagramsField.node_data.split(',').map(x => x.trim());
+        this.selectedNodeDisplay = this.headers.map(h => savedHeaders.includes(h));
+      }
+
+      // FIX: mapping restoration
+      this.restoreMappingFromSavedNodeData();
     });
   }
+
+  restoreMappingFromSavedNodeData() {
+    if (!this.diagramsField.node_data || this.headers.length === 0) return;
+
+    const nodeList = this.diagramsField.node_data.split(',').map(x => x.trim());
+
+    this.selectedNodeDisplay = this.headers.map(h => nodeList.includes(h));
+  }
+
+
 
   ngOnDestroy() {
     if (this.cy) this.cy.destroy();
