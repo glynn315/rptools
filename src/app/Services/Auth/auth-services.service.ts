@@ -27,6 +27,16 @@ export class AuthService {
   me() {
     return this.http.get(`${this.api}/me`);
   }
+  getUserFromAPI(): Observable<any> {
+    return from(this.token).pipe(
+      switchMap(token => {
+        const headers = new HttpHeaders({
+          Authorization: `Bearer ${token}`
+        });
+        return this.http.get(`${this.apiUrl}/me`, { headers });
+      })
+    );
+  }
 
   isAuthenticated() {
     return !!this.token();
