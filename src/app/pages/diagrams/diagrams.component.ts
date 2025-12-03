@@ -105,7 +105,7 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
             'text-valign': 'center',
             'text-halign': 'center',
             shape: 'round-rectangle',
-            padding: '20px',
+            padding: '10px',
             'background-color': '#90caf9',
             'border-color': '#0d47a1',
             width: '400px',
@@ -338,22 +338,44 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         alert('Failed to load sheet.');
       });
   }
+  parseSheetValue(value: any) {
+    if (typeof value === 'number') {
+      // Google Sheets serial to JS Date
+      const epoch = new Date(1899, 11, 30); // Dec 30, 1899
+      const milliseconds = Math.floor(value) * 24 * 60 * 60 * 1000;
+      const date = new Date(epoch.getTime() + milliseconds);
+
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const day = date.getDate().toString().padStart(2, '0');
+      const year = date.getFullYear();
+
+      return `${month}/${day}/${year}`;
+    }
+    return value?.toString() ?? '';
+  }
+
   generateNodesDynamic() {
-    if (this.cy) this.cy.elements().remove();
+    if (!this.cy) return;
+
+    // Remove only sheet-generated edges
+    this.cy.edges('[sourceTag = "sheet"]').remove();
+
     const selectedHeaders = this.headers
       .filter((_, i) => this.selectedNodeDisplay[i])
       .map(h => h.trim());
     this.diagramsField.node_data = selectedHeaders.join(',');
+
     const data = this.rows.map((row: any, i: number) => {
       const cells = row.c || [];
-
       const id = (cells[this.mapping.id]?.v ?? `auto-${i}`).toString().trim();
       const label = (cells[this.mapping.label]?.v ?? id).toString().trim();
       const details: Record<string, any> = {};
+
       selectedHeaders.forEach(h => {
         const colIndex = this.headers.indexOf(h);
-        details[h] = (cells[colIndex]?.v ?? '').toString();
+        details[h] = this.parseSheetValue(cells[colIndex]?.v);
       });
+
       const dep = this.mapping.dependency !== null
         ? (cells[this.mapping.dependency]?.v ?? '').toString().trim()
         : '';
@@ -361,24 +383,32 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       return { id, label, dep, details };
     });
 
-
-
     const idSet = new Set(data.map(x => x.id));
+
+    // Add or update sheet nodes
     data.forEach((item, i) => {
       const extra = Object.entries(item.details)
         .map(([k, v]) => `${k}: ${v}`)
         .join('\n');
-
       const displayLabel = extra ? `${item.label}\n${extra}` : item.label;
-      if (this.cy.$id(item.id).length === 0) {
+
+      const existingNode = this.cy.$id(item.id);
+      if (existingNode.length > 0) {
+        existingNode.data('label', item.label);
+        existingNode.data('details', item.details);
+        existingNode.data('displayLabel', displayLabel);
+        existingNode.data('source', 'sheet');
+      } else {
         this.cy.add({
           group: 'nodes',
-          data: { id: item.id, label: item.label, displayLabel, details: item.details },
+          data: { id: item.id, label: item.label, displayLabel, details: item.details, source: 'sheet' },
           position: { x: 200 + (i % 4) * 260, y: 120 + Math.floor(i / 4) * 150 }
         });
       }
     });
-    data.forEach((item) => {
+
+    // Add dependency edges (red)
+    data.forEach(item => {
       if (!item.dep) return;
       const deps = item.dep.split(',').map((x: string) => x.trim()).filter(Boolean);
       deps.forEach((dep: any) => {
@@ -386,23 +416,28 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
           this.cy.add({
             group: 'nodes',
             classes: 'placeholder',
-            data: { id: dep, label: dep, displayLabel: dep, details: {} }
+            data: { id: dep, label: dep, displayLabel: dep, details: {}, source: 'sheet' }
           });
         }
         const edgeId = `e-${dep}-${item.id}`;
         if (this.cy.$id(edgeId).length === 0) {
           this.cy.add({
             group: 'edges',
-            data: { id: edgeId, source: dep, target: item.id }
+            data: { id: edgeId, source: dep, target: item.id, sourceTag: 'sheet' },
+            style: { 'line-color': 'red', 'target-arrow-color': 'red' }
           });
         }
       });
     });
 
-    // apply connection style and run layout
+    // Ensure manual edges remain black
+    this.cy.edges('[sourceTag = "manual"]').style({ 'line-color': 'black', 'target-arrow-color': 'black' });
+
     this.applyConnectionStyle();
     this.layout();
   }
+
+
 
   refreshFromSheet() {
     if (!this.diagramsField.sheet_url) {

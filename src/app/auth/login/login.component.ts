@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
-import { LucideAngularModule, UserLock, RectangleEllipsis } from 'lucide-angular';
+import { LucideAngularModule, UserLock, RectangleEllipsis, CircleX } from 'lucide-angular';
 import { AuthService } from '../../Services/Auth/auth-services.service';
 import { User } from '../../Models/User/user.model';
 
@@ -19,6 +19,10 @@ export class LoginComponent implements OnInit {
 
   readonly Usericon = UserLock;
   readonly PassIcon = RectangleEllipsis;
+  readonly CloseIcon = CircleX;
+
+  userFilter = '';
+  filteredUsers: User[] = [];
 
   username = '';
   password = '';
@@ -37,9 +41,9 @@ export class LoginComponent implements OnInit {
     this.initializeGoogleLogin();
   }
 
-  /** -------------------------
-   *  NORMAL LOGIN
-   * --------------------------*/
+  // -----------------------
+  // NORMAL LOGIN
+  // -----------------------
   login() {
     this.loading = true;
     this.errorMessage = '';
@@ -56,6 +60,10 @@ export class LoginComponent implements OnInit {
         }
       });
   }
+
+  // -----------------------
+  // GOOGLE LOGIN
+  // -----------------------
   initializeGoogleLogin() {
     google.accounts.id.initialize({
       client_id: '1082301013663-app75h83b1jqg7bbn3threhfued4ga6m.apps.googleusercontent.com',
@@ -75,11 +83,12 @@ export class LoginComponent implements OnInit {
 
   handleGoogleResponse(response: any) {
     const token = response.credential;
+
     this.authServices.googleLogin(token).subscribe({
       next: (res: any) => {
         this.loading = false;
 
-        // Store token for future API calls
+        // Save token both places
         localStorage.setItem('token', res.access_token);
         this.authServices.token.set(res.access_token);
 
@@ -91,10 +100,9 @@ export class LoginComponent implements OnInit {
     });
   }
 
-
-  /** -------------------------
-   *  USER REGISTRATION MODAL
-   * --------------------------*/
+  // -----------------------
+  // USER REGISTRATION MODAL
+  // -----------------------
   openRegistration() {
     this.UserRegistrationModal = true;
   }
@@ -102,12 +110,21 @@ export class LoginComponent implements OnInit {
   displayUsersList() {
     this.authServices.displayuserList().subscribe((data) => {
       this.UserList = data;
+      this.filteredUsers = data;
     });
+  }
+
+  applyFilter() {
+    const filterValue = this.userFilter.toLowerCase();
+
+    this.filteredUsers = this.UserList.filter(user =>
+      `${user.firstname} ${user.lastname}`.toLowerCase().includes(filterValue)
+    );
   }
 
   registerUser(s_bpartner_employee_id: number) {
     if (s_bpartner_employee_id) {
-      this.router.navigate(['/register'], { queryParams: { id: s_bpartner_employee_id } });
+      this.router.navigate([`/register/${s_bpartner_employee_id}`]);
     }
   }
 }

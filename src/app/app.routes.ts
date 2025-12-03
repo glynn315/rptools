@@ -6,12 +6,14 @@ import { LayoutComponent } from './layout/layout/layout.component';
 import { DiagramslistComponent } from './pages/diagrams/diagramslist/diagramslist.component';
 import { LoginComponent } from './auth/login/login.component';
 import { RegisterComponent } from './auth/register/register.component';
+import { ProfileComponent } from './pages/profile/profile.component';
+import { AuthGuard } from './guard/auth.guard';
 
 export const routes: Routes = [
     {path:'' , redirectTo:'login' , pathMatch:'full'},
     {path:'login' , component: LoginComponent},
     {path:'register/:s_bpartner_employee_id' , component: RegisterComponent},
-    {path: 'home' , component:LayoutComponent ,
+    {path: 'home' , component:LayoutComponent ,canActivate: [AuthGuard],
         children: [
             {path: 'diagramsDisplay', component: DiagramslistComponent},
             {path: 'diagrams', component: DiagramslistComponent},
@@ -20,6 +22,7 @@ export const routes: Routes = [
             {path: 'conversion', component: ConversionComponent},
             {path: 'documents', component: DocumentsComponent},
             {path: 'notes', component: DiagramslistComponent},
+            {path: 'profile/:id', component: ProfileComponent},
         ]
     }
 ];

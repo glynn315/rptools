@@ -1,18 +1,19 @@
 <div class="page flexcol justify-center">
-    <div class="w-[80%] h-full p-3">
-        <div class="border-b-2 pb-3 flexrow justify-between items-center">
-            <header class="text-xl">Diagrams List <p>Welcome, {{ user.name }}!</p></header>
+    <div class="w-[80%] h-full">
+        <div class="border-b-2 pb-3 flexrow justify-between items-center p-3">
+            <header class="text-xl">Diagrams List <p>Welcome, {{ user.name | titlecase}}!</p></header>
             <button class="px-5 py-2 rounded-xl text-white bg-primary" (click)="newDiagram()">New Diagram</button>
         </div>
-        <div class="w-full h-[80%] overflow-auto mt-5 flexcol gap-4">
-            <div *ngFor="let diagram of diagramsList; let index = index" class="w-full p-3">
-                <div class="w-full border rounded-xl p-4 flexrow justify-between items-center">
+        <div class="w-full h-[80%] overflow-auto mt-5 flexcol !gap-1">
+            <div *ngFor="let diagram of diagramsList; let index = index" class="w-full pt-2 pr-4">
+                <div class="w-full border rounded-xl p-2 pl-4 flexrow justify-between items-center">
                     <div>
-                        <span>{{diagram.name}}</span>
+                        <span>{{diagram.name | titlecase}}</span>
                         <p>{{diagram.description}}</p>
                     </div>
-                    <div>
-                        <button (click)="viewDiagrams(diagram.id!)">View</button>
+                    <div class="flexrow ">
+                        <button class="bg-green-700 text-white p-2 px-5 rounded-xl">Share Diagrams</button>
+                        <button class="bg-blue-700 text-white p-2 px-5 rounded-xl" (click)="viewDiagrams(diagram.id!)">View</button>
                     </div>
                 </div>
             </div>
