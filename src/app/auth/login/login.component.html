@@ -51,20 +51,20 @@
 </div>
 
 <div *ngIf="UserRegistrationModal" class="w-full bg-black/50 h-dvh !absolute top-0">
-  <div class="w-[40%] h-[60%] overflow-auto flex-1 p-4 rounded-xl bg-accent fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
-    <div class="flexrow !justify-between">
-      <header></header>
-      <button (click)="UserRegistrationModal = false">X</button>
+  <div class="w-[40%] h-[60%] flex-1 p-4 rounded-xl bg-accent fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50">
+    <div class="flexrow !justify-between !items-center">
+      <input type="text" placeholder="Search user..." class="w-full p-2 rounded-lg border" [(ngModel)]="userFilter" (input)="applyFilter()"/>
+      <button (click)="UserRegistrationModal = false"><lucide-icon [img]="CloseIcon"></lucide-icon></button>
     </div>
-    <form>
-
-    </form>
-    <div *ngFor="let user of UserList" class="flexrow !items-center justify-between border-b py-2">
-      <div>
-        {{ user.firstname | titlecase}} {{ user.lastname | titlecase}}
+    
+    <div class=" h-[90%] overflow-auto pr-3 pl-1">
+      <header class="text-xl font-semibold mt-2 mb-1">Select Account</header>
+      <div *ngFor="let user of filteredUsers" class="flexrow !items-center justify-between border-b py-2">
+        <div>
+          {{ user.firstname | titlecase}} {{ user.lastname | titlecase}}
+        </div>
+        <button (click)="registerUser(user.s_bpartner_employee_id!)">Select</button>
       </div>
-      <button (click)="registerUser(user.s_bpartner_employee_id!)">Select</button>
-      
     </div>
   </div>
 </div>

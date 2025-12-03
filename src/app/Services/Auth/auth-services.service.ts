@@ -1,6 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { from, Observable, tap } from 'rxjs';
+import { catchError, from, Observable, of, tap } from 'rxjs';
 import { User } from '../../Models/User/user.model';
 
 @Injectable({ providedIn: 'root' })
@@ -16,11 +16,35 @@ export class AuthService {
   }
 
   logout() {
-    this.token.set(null);
-    return this.http.post(`${this.apiUrl}/logout`, {}, {
-      headers: { Authorization: `Bearer ${this.token()}` }
-    });
+    const authToken = this.token();
+
+    if (!authToken) {
+      // No token → just clear and exit
+      this.token.set(null);
+      localStorage.removeItem('token');
+      return of(true);
+    }
+
+    return this.http.post(
+      `${this.apiUrl}/logout`,
+      {},
+      {
+        headers: { Authorization: `Bearer ${authToken}` }
+      }
+    ).pipe(
+      tap(() => {
+        this.token.set(null);
+        localStorage.removeItem('token');
+      }),
+      catchError(err => {
+        // Still clear token even if logout fails
+        this.token.set(null);
+        localStorage.removeItem('token');
+        return of(err);
+      })
+    );
   }
+
   displayuserList(): Observable<User[]>{
     return this.http.get<User[]>(`${this.apiUrl}/userAccount`);
   }
