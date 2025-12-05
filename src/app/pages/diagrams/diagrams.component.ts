@@ -35,7 +35,7 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly RefreshIcon = RefreshCcw;
 
   @ViewChild('cyContainer') cyContainer!: ElementRef;
-
+  jsonLoaded = false;
   cy: any;
   nodeIndex = 1;
   connectMode = false;
@@ -54,7 +54,12 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
   filterValues: string[] = [];
   selectedFilterValue: string = '';
   mapping = { id: 0, label: 1, dependency: null as number | null , filter: null as number | null };
-
+  statusColors: any = {
+    "Closed": "#9e9e9e",
+    "Unmatched BOQ": "#42a5f5",
+    "Budgeting": "#ef5350",
+    "Commenced": "#66bb6a"
+  };
   diagramsField: Diagrams = {
     name: '',
     description: '',
@@ -117,7 +122,7 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
             padding: '10px',
             'background-color': '#90caf9',
             'border-color': '#0d47a1',
-            width: '400px',
+            width: 'label',
             height: 'label',
             'border-width': 1,
             'text-wrap': 'wrap',
@@ -132,6 +137,14 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
             'target-arrow-shape': 'triangle',
             'line-color': '#64b5f6',
             'target-arrow-color': '#1976d2',
+            width: 2
+          }
+        },
+        {
+          selector: 'edge[sourceTag = "sheet"]',
+          style: {
+            'line-color': 'red',
+            'target-arrow-color': 'red',
             width: 2
           }
         },
@@ -191,7 +204,7 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
     const label = 'New Node';
     this.cy.add({
       group: 'nodes',
-      data: { id, label, displayLabel: label, details: {} },
+      data: { id, label, displayLabel: label, details: {},sheetNode: "no"  },
       position: { x: 200 + Math.random() * 150, y: 150 + Math.random() * 150 }
     });
   }
@@ -329,6 +342,85 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       alert("Color Saved");
     }, () => alert('Failed to save color'));
   }
+  normalizeDate(value: any): Date | null {
+    if (!value) return null;
+
+    // If Google Sheets serial (number)
+    if (typeof value === 'number') {
+      const epoch = new Date(1899, 11, 30);
+      return new Date(epoch.getTime() + value * 24 * 60 * 60 * 1000);
+    }
+
+    // Direct parse first
+    let d = new Date(value);
+    if (!isNaN(d.getTime())) return d;
+
+    // Handle DD/MM/YYYY or MM/DD/YYYY safely by swapping if needed
+    const parts = value.split('/');
+    if (parts.length === 3) {
+      const [a, b, c] = parts;
+      let month = parseInt(a);
+      let day = parseInt(b);
+
+      if (month > 12) { 
+        // swap
+        month = parseInt(b);
+        day = parseInt(a);
+      }
+
+      return new Date(`${month}/${day}/${c}`);
+    }
+
+    return null;
+  }
+  autoLayoutByTargetEnd() {
+    if (!this.cy) return;
+    const groups: any = {};
+
+    this.cy.nodes().forEach((node: any) => {
+      const details = node.data("details") || {};
+      const rawEnd = details["Target End"];
+
+      const parsed = this.normalizeDate(rawEnd);
+
+      const key = parsed
+        ? parsed.toISOString().split("T")[0]
+        : "Unknown";
+
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(node);
+    });
+    const sortedKeys = Object.keys(groups).sort((a, b) => {
+      const da = new Date(a);
+      const db = new Date(b);
+      return da.getTime() - db.getTime();
+    });
+
+    // --- Step 3: Layout rows ---
+    let baseY = 100;
+    const rowSpacing = 250;
+    const colSpacing = 280;
+
+    sortedKeys.forEach((key, rowIndex) => {
+      const rowNodes = groups[key];
+      let xStart = 150;
+      const y = baseY + rowIndex * rowSpacing;
+
+      rowNodes.forEach((node: any, i: number) => {
+        node.position({
+          x: xStart + i * colSpacing,
+          y: y
+        });
+      });
+    });
+
+    // --- Step 4: Animate & Fit ---
+    this.cy.animate({
+      fit: { padding: 50 },
+      duration: 600
+    });
+  }
+
   extractSheetID(url: string) {
     if (!url) return null;
     const match = url.match(/\/d\/(.*?)\//);
@@ -363,9 +455,11 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         this.restoreMappingFromSavedNodeData();
         this.diagramsField.sheet_url = url;
         if (generate) {
+          this.restoreMappingFromSavedNodeData();
+          this.applySavedMapping();
           this.generateNodesDynamic();
         } else {
-          this.showMappingModal = true;
+          this.restoreMappingFromSavedNodeData();
         }
       })
       .catch(err => {
@@ -373,6 +467,18 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         alert('Failed to load sheet.');
       });
   }
+  applySavedMapping() {
+    if (!this.headers.length) return;
+    this.mapping.id = 0;
+    this.mapping.label = 1;
+    if (this.diagramsField.dependency === 'yes') {
+      const depIndex = this.headers.indexOf(this.diagramsField.dependency_value!);
+      this.mapping.dependency = depIndex >= 0 ? depIndex : null;
+    } else {
+      this.mapping.dependency = null;
+    }
+  }
+
   parseSheetValue(value: any) {
     if (typeof value === 'number') {
       // Google Sheets serial to JS Date
@@ -391,19 +497,20 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
 
   generateNodesDynamic() {
     if (!this.cy) return;
-    this.cy.nodes('[sheetNode = "yes"]').remove();
+    this.cy.nodes().filter((n: any) => n.data('sheetNode') === 'yes').remove();
     this.cy.edges('[sourceTag = "sheet"]').remove();
-
+    const selectedHeaders = this.headers
+      .filter((_, i) => this.selectedNodeDisplay[i])
+      .map(h => h.trim());
+    this.diagramsField.node_data = selectedHeaders.join(',');
     const idCol = this.mapping.id;
     const labelCol = this.mapping.label;
     const depCol = this.mapping.dependency;
     const filterCol = this.mapping.filter;
-
+    
     for (const row of this.rows) {
       const cells = row.c;
       if (!cells) continue;
-
-      // FILTER BLOCK
       if (filterCol !== null) {
         const filterValue = this.parseSheetValue(cells[filterCol]?.v)?.toString().trim() || "";
         if (filterValue !== this.selectedFilterValue) {
@@ -422,6 +529,16 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
           details[header] = this.parseSheetValue(cells[index]?.v);
         }
       });
+      let nodeColor = "#E3E3E3"; // default
+
+      const statusValue =
+        details["Status"] ??
+        details["status"] ??
+        details["STATUS"];
+
+      if (statusValue && this.statusColors[statusValue]) {
+        nodeColor = this.statusColors[statusValue];
+      }
 
       const extra = Object.entries(details)
         .map(([k, v]) => `${k}: ${v}`)
@@ -436,6 +553,10 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
           displayLabel,
           details,
           sheetNode: "yes"
+        },
+        style: {
+          "background-color": nodeColor,
+          "border-color": "#1a237e"
         },
         position: { x: Math.random() * 600, y: Math.random() * 600 }
       });
@@ -468,6 +589,13 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
     }
     this.loadSheetFromUrl(this.diagramsField.sheet_url!, true);
   }
+  hasSavedMapping() {
+    return (
+      this.diagramsField.node_data &&
+      this.diagramsField.node_data.length > 0 &&
+      this.diagramsField.dependency_value !== undefined
+    );
+  }
   loadSheetForRefresh() {
     this.refreshFromSheet();
   }
@@ -478,10 +606,13 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         this.sheetUrl = this.diagramsField.sheet_url;
         this.loadSheetFromUrl(this.diagramsField.sheet_url, false);
       }
-      if (this.diagramsField.json_data) {
+      if (!this.jsonLoaded && this.diagramsField.json_data) {
         try {
           const json = JSON.parse(this.diagramsField.json_data);
+
           this.cy.json(json);
+          this.jsonLoaded = true;
+
           setTimeout(() => {
             this.cy.nodes().forEach((node: any) => node.trigger('resize'));
             this.cy.edges().forEach((edge: any) => edge.trigger('position'));
@@ -493,12 +624,14 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
           console.warn('Invalid saved json_data');
         }
       }
+
       this.restoreMappingFromSavedNodeData();
     }, (err) => {
       console.error(err);
       alert('Failed to fetch diagram');
     });
   }
+
 
   restoreMappingFromSavedNodeData() {
     if (!this.diagramsField.node_data) return;
