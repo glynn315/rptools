@@ -12,6 +12,7 @@ import { HttpClientModule } from '@angular/common/http';
 import { ActivatedRoute } from '@angular/router';
 import nodeResize from 'cytoscape-node-resize';
 import { AuthService } from '../../Services/Auth/auth-services.service';
+
 (cytoscape as any).use(nodeResize);
 (cytoscape as any).use(dagre);
 
@@ -60,13 +61,33 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
   rows: any[] = [];
   filterValues: string[] = [];
   selectedFilterValue: string = '';
-  mapping = { id: 0, label: 1, dependency: null as number | null , filter: null as number | null };
+  mapping = { id: 0, label: 1, dependency: null as number | null, filter: null as number | null };
   statusColors: any = {
-    "Closed": "#9e9e9e",
-    "Unmatched BOQ": "#42a5f5",
-    "Budgeting": "#ef5350",
-    "Commenced": "#66bb6a"
+    "Closed": "#68fa57",
+    "Unmatched BOQ": "#FFF",
+    "Budgeting": "#ffb24d",
+    "Commenced": "#5e89ff",
+    "Halted": "#c9c9c9",
   };
+
+  getStatusColor(statusValue: string): string {
+    if (!statusValue) return "#E3E3E3";
+    
+    const normalizedStatus = statusValue.toString().trim();
+    
+    if (this.statusColors[normalizedStatus]) {
+      return this.statusColors[normalizedStatus];
+    }
+    
+    const lowerStatus = normalizedStatus.toLowerCase();
+    for (const [key, color] of Object.entries(this.statusColors)) {
+      if (key.toLowerCase() === lowerStatus) {
+        return color as string;
+      }
+    }
+    
+    return "#E3E3E3";
+  }
   diagramsField: Diagrams = {
     name: '',
     description: '',
@@ -193,7 +214,6 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       const node = evt.target;
       const nodeId = node.id();
       
-      // Handle line drawing mode
       if (this.lineMode) {
         const pos = node.position();
         if (!this.lineStartPos) {
@@ -201,12 +221,10 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         } else {
           let endPos = { x: pos.x, y: pos.y };
           
-          // Check if Shift key is pressed for straight lines
           if (evt.originalEvent && evt.originalEvent.shiftKey) {
             const dx = Math.abs(endPos.x - this.lineStartPos.x);
             const dy = Math.abs(endPos.y - this.lineStartPos.y);
             
-            // Snap to horizontal or vertical
             if (dx > dy) {
               endPos.y = this.lineStartPos.y;
             } else {
@@ -232,7 +250,6 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
       
-      // Special handling for label nodes
       if (node.data('nodeType') === 'label') {
         const newLabel = prompt('Edit Text:', node.data('label'));
         if (newLabel !== null) {
@@ -242,9 +259,7 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
       
-      // Handle line anchor nodes - allow repositioning
       if (node.data('nodeType') === 'lineAnchor') {
-        // You can just drag these to reposition the line
         return;
       }
       
@@ -259,7 +274,6 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     });
     
-    // Add tap event for background (canvas) clicks for line drawing
     this.cy.on('tap', (evt: any) => {
       if (evt.target === this.cy && this.lineMode) {
         const pos = evt.position;
@@ -268,17 +282,13 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         } else {
           let endPos = { x: pos.x, y: pos.y };
           
-          // Check if Shift key is pressed for straight lines
           if (evt.originalEvent && evt.originalEvent.shiftKey) {
             const dx = Math.abs(endPos.x - this.lineStartPos.x);
             const dy = Math.abs(endPos.y - this.lineStartPos.y);
             
-            // Snap to horizontal or vertical based on which difference is larger
             if (dx > dy) {
-              // Horizontal line
               endPos.y = this.lineStartPos.y;
             } else {
-              // Vertical line
               endPos.x = this.lineStartPos.x;
             }
           }
@@ -290,7 +300,6 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     });
     
-    // Add drag event listener to constrain line anchor movement
     this.cy.on('drag', 'node[nodeType = "lineAnchor"]', (evt: any) => {
       const node = evt.target;
       const linkedAnchorId = node.data('linkedAnchor');
@@ -304,12 +313,9 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
           const dx = Math.abs(currentPos.x - linkedPos.x);
           const dy = Math.abs(currentPos.y - linkedPos.y);
           
-          // Constrain to horizontal or vertical
           if (dx > dy) {
-            // Keep horizontal
             node.position({ x: currentPos.x, y: linkedPos.y });
           } else {
-            // Keep vertical
             node.position({ x: linkedPos.x, y: currentPos.y });
           }
         }
@@ -319,7 +325,6 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
     this.cy.on('cxttap', 'node', (evt: any) => {
       const node = evt.target;
       
-      // If it's a line anchor, delete the anchor and its connected edge
       if (node.data('nodeType') === 'lineAnchor') {
         const connectedEdges = node.connectedEdges();
         this.cy.remove(connectedEdges);
@@ -343,7 +348,6 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       const node = evt.target;
       node.data('width', node.width());
       node.data('height', node.height());
-      console.log(`Resized ${node.data('id')} to ${node.width()}x${node.height()}`);
     });
   }
   
@@ -367,12 +371,10 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
   }
   
   createLine(start: { x: number; y: number }, end: { x: number; y: number }) {
-    // Create two invisible anchor nodes at the start and end points
     const startNodeId = 'line-start-' + Date.now();
     const endNodeId = 'line-end-' + Date.now();
     const edgeId = 'line-edge-' + Date.now();
     
-    // Add invisible anchor nodes - make them independent
     this.cy.add([
       {
         group: 'nodes',
@@ -406,7 +408,6 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     ]);
     
-    // Create edge connecting the two anchor nodes
     this.cy.add({
       group: 'edges',
       data: {
@@ -445,12 +446,10 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
     
-    // Get canvas center
     const extent = this.cy.extent();
     const centerX = (extent.x1 + extent.x2) / 2;
     const centerY = (extent.y1 + extent.y2) / 2;
     
-    // Move all selected nodes to center
     selectedNodes.forEach((node: any) => {
       node.position({ x: centerX, y: centerY });
     });
@@ -464,14 +463,12 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
     
-    // Calculate average Y position
     let totalY = 0;
     selectedNodes.forEach((node: any) => {
       totalY += node.position().y;
     });
     const avgY = totalY / selectedNodes.length;
     
-    // Align all nodes to the same Y (horizontal alignment)
     selectedNodes.forEach((node: any) => {
       const pos = node.position();
       node.position({ x: pos.x, y: avgY });
@@ -486,14 +483,12 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
     
-    // Calculate average X position
     let totalX = 0;
     selectedNodes.forEach((node: any) => {
       totalX += node.position().x;
     });
     const avgX = totalX / selectedNodes.length;
     
-    // Align all nodes to the same X (vertical alignment)
     selectedNodes.forEach((node: any) => {
       const pos = node.position();
       node.position({ x: avgX, y: pos.y });
@@ -592,13 +587,6 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       this.diagramsField.dependency = 'yes';
       this.diagramsField.dependency_value = this.headers[this.mapping.dependency] ?? '';
     }
-    if (!this.sheetUrl || this.mapping.filter === null) {
-      // this.diagramsField.dependency = 'no';
-      // this.diagramsField.dependency_value = '';
-    } else {
-      // this.diagramsField.dependency = 'yes';
-      // this.diagramsField.dependency_value = this.headers[this.mapping.dependency] ?? '';
-    }
     if (!this.diagramID) {
       this.DiagramService.storeDiagrams(this.diagramsField).subscribe(
         (res: any) => {
@@ -635,14 +623,13 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
   normalizeDate(value: any): Date | null {
     if (!value) return null;
     
-    // Handle string format like "Date(2025,11,26)"
     if (typeof value === 'string' && value.startsWith('Date(')) {
       const match = value.match(/Date\((\d+),(\d+),(\d+)\)/);
       if (match) {
         const year = parseInt(match[1]);
-        const month = parseInt(match[2]) - 1; // JavaScript months are 0-indexed
+        const month = parseInt(match[2]);
         const day = parseInt(match[3]);
-        return new Date(year, month, day);
+        return new Date(year, month - 1, day);
       }
     }
     
@@ -669,7 +656,6 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
   autoLayoutByTargetEnd() {
     if (!this.cy) return;
     
-    // Remove existing month header nodes and red lines
     this.cy.nodes('[nodeType = "monthHeader"]').remove();
     this.cy.nodes('[nodeType = "redLine"]').remove();
     
@@ -677,14 +663,12 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
     let farthestDate: Date | null = null;
     let farthestKey: string | null = null;
 
-    // Group nodes by Target End month/year and track the farthest date
     this.cy.nodes().forEach((node: any) => {
       const details = node.data("details") || {};
       const rawEnd = details["Target End"];
 
       const parsed = this.normalizeDate(rawEnd);
 
-      // Group by month/year
       const key = parsed
         ? `${parsed.getFullYear()}-${(parsed.getMonth() + 1).toString().padStart(2, '0')}`
         : "Unknown";
@@ -697,50 +681,44 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       }
       groups[key].nodes.push(node);
       
-      // Track the farthest date
       if (parsed && (!farthestDate || parsed > farthestDate)) {
         farthestDate = parsed;
         farthestKey = key;
       }
     });
 
-    // Sort keys chronologically
     const sortedKeys = Object.keys(groups).sort((a, b) => {
       if (a === "Unknown") return 1;
       if (b === "Unknown") return -1;
       return a.localeCompare(b);
     });
 
-    // Layout in vertical columns by month/year
     let baseX = 150;
-    const colSpacing = 350;  // Horizontal spacing between month groups
-    const rowSpacing = 180;  // Vertical spacing between nodes in same month
-    const headerOffset = 80; // Space for month header
+    const colSpacing = 350;
+    const rowSpacing = 180;
+    const headerOffset = 80;
 
     const monthNames = [
       "January", "February", "March", "April", "May", "June",
       "July", "August", "September", "October", "November", "December"
     ];
 
-    let farthestX = baseX; // Track the farthest column X position
-    const farthestNodes: any[] = []; // Store nodes in the farthest column
+    let farthestX = baseX;
+    const farthestNodes: any[] = [];
 
     sortedKeys.forEach((key, colIndex) => {
       const group = groups[key];
       const colNodes = group.nodes;
       const x = baseX + colIndex * colSpacing;
       
-      // Update farthest X position and track farthest nodes
       if (x > farthestX) {
         farthestX = x;
       }
       
-      // Store nodes if this is the farthest date column
       if (key === farthestKey) {
         farthestNodes.push(...colNodes);
       }
       
-      // Create month header label
       let headerLabel = "Unknown";
       if (group.date) {
         const monthName = monthNames[group.date.getMonth()];
@@ -748,7 +726,6 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         headerLabel = `${monthName} ${year} target end`;
       }
 
-      // Add header node
       this.cy.add({
         group: 'nodes',
         data: {
@@ -774,7 +751,6 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         grabbable: false
       });
 
-      // Position nodes vertically in this column
       let yStart = 50 + headerOffset;
       colNodes.forEach((node: any, i: number) => {
         node.position({
@@ -784,13 +760,11 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       });
     });
 
-    // Add red vertical line at the farthest target end column
     if (sortedKeys.length > 0) {
-      // Calculate the height based on nodes in the last column
       const lastKey = sortedKeys[sortedKeys.length - 1];
       const lastGroup = groups[lastKey];
       const numNodes = lastGroup.nodes.length;
-      const lineHeight = (50 + headerOffset) + (numNodes * rowSpacing) + 100; // Extra padding
+      const lineHeight = (50 + headerOffset) + (numNodes * rowSpacing) + 100;
       
       const lineId = 'redline-' + Date.now();
       
@@ -816,10 +790,8 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       });
     }
     
-    // Color all edges: blue for normal nodes, keep original for farthest nodes
     const farthestNodeIds = new Set(farthestNodes.map((n: any) => n.id()));
     
-    // Reset all sheet edges to default black color
     this.cy.edges('[sourceTag = "sheet"]').forEach((edge: any) => {
       edge.style({
         'line-color': '#333333',
@@ -828,7 +800,6 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       });
     });
 
-    // Animate & Fit
     this.cy.animate({
       fit: { padding: 50 },
       duration: 600
@@ -898,6 +869,15 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
   }
   
   parseSheetValue(value: any) {
+    if (typeof value === 'string' && value.startsWith('Date(')) {
+      const match = value.match(/Date\((\d+),(\d+),(\d+)\)/);
+      if (match) {
+        const year = parseInt(match[1]);
+        const month = parseInt(match[2]);
+        const day = parseInt(match[3]);
+        return `${month}/${day}/${year}`;
+      }
+    }
     if (typeof value === 'number') {
       const epoch = new Date(1899, 11, 30);
       const milliseconds = Math.floor(value) * 24 * 60 * 60 * 1000;
@@ -922,6 +902,10 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
     const labelCol = this.mapping.label;
     const depCol = this.mapping.dependency;
     const filterCol = this.mapping.filter;
+    
+    const existingNodeIds = new Set<string>();
+    const nodeDependencies: Array<{nodeId: string, dependencies: string[]}> = [];
+    
     for (const row of this.rows) {
       const cells = row.c;
       if (!cells) continue;
@@ -931,9 +915,15 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
           continue;
         }
       }
-      const nodeId = this.parseSheetValue(cells[idCol]?.v)?.toString() || "";
+      let nodeId = this.parseSheetValue(cells[idCol]?.v)?.toString() || "";
       const nodeLabel = this.parseSheetValue(cells[labelCol]?.v)?.toString() || "";
       if (!nodeId) continue;
+      
+      if (existingNodeIds.has(nodeId)) {
+        nodeId = `${nodeId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      }
+      existingNodeIds.add(nodeId);
+      
       const details: any = {};
       this.headers.forEach((header, index) => {
         if (this.selectedNodeDisplay[index]) {
@@ -941,13 +931,8 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         }
       });
       let nodeColor = "#E3E3E3";
-      const statusValue =
-        details["Status"] ??
-        details["status"] ??
-        details["STATUS"];
-      if (statusValue && this.statusColors[statusValue]) {
-        nodeColor = this.statusColors[statusValue];
-      }
+      const statusValue = details["Status"] ?? details["status"] ?? details["STATUS"] ?? details["project_status"];
+      nodeColor = this.getStatusColor(statusValue);
       const extra = Object.entries(details)
         .map(([k, v]) => `${k}: ${v}`)
         .join("\n");
@@ -967,10 +952,20 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         },
         position: { x: Math.random() * 600, y: Math.random() * 600 }
       });
+      
       if (depCol !== null) {
         const depRaw = this.parseSheetValue(cells[depCol]?.v)?.toString() || "";
         const dependencies = depRaw.split(",").map((v: string) => v.trim()).filter((v: string | any[]) => v.length > 0);
-        dependencies.forEach((dep: any) => {
+        nodeDependencies.push({ nodeId, dependencies });
+      }
+    }
+    
+    for (const { nodeId, dependencies } of nodeDependencies) {
+      dependencies.forEach((dep: any) => {
+        const targetNode = this.cy.$id(nodeId);
+        const sourceNode = this.cy.$id(dep);
+        
+        if (targetNode.length > 0 && sourceNode.length > 0) {
           this.cy.add({
             group: "edges",
             data: {
@@ -981,9 +976,10 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
             },
             style: this.getConnectionStyle()
           });
-        });
-      }
+        }
+      });
     }
+    
     this.layout();
   }
   
@@ -1006,10 +1002,7 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         this.headers = json.table.cols.map((c: any) => c.label || 'Column');
         this.rows = json.table.rows || [];
         
-        // Update existing nodes with new data from sheet
         this.updateNodesFromSheet();
-        
-        // Calculate and show critical path
         this.showCriticalPath();
         
         alert('Data refreshed and critical path highlighted!');
@@ -1023,7 +1016,6 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
   showCriticalPath() {
     if (!this.cy) return;
     
-    // First, reset ALL edges to black
     this.cy.edges('[sourceTag = "sheet"]').forEach((edge: any) => {
       edge.style({
         'line-color': '#333333',
@@ -1032,29 +1024,20 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       });
     });
     
-    // Find the node(s) with the absolute farthest target end date
     let farthestDate: Date | null = null;
     let farthestTimestamp: number | null = null;
     const farthestNodes: any[] = [];
     
-    // First pass: find the absolute latest date and debug
     this.cy.nodes('[sheetNode = "yes"]').forEach((node: any) => {
       const details = node.data("details") || {};
-      console.log('Node:', node.data('label'));
-      console.log('Details:', details);
-      
-      // Try multiple possible column names
       const rawEnd = details["Target End"] || 
                      details["Target end"] || 
                      details["target end"] ||
                      details["TargetEnd"] ||
                      details["target_end"];
       
-      console.log('Raw end value:', rawEnd);
-      
       if (rawEnd) {
         const parsed = this.normalizeDate(rawEnd);
-        console.log('Parsed date:', parsed);
         
         if (parsed && !isNaN(parsed.getTime())) {
           const timestamp = parsed.getTime();
@@ -1067,12 +1050,10 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
     });
     
     if (!farthestDate || farthestTimestamp === null) {
-      console.log('No valid dates found');
       alert('No valid "Target End" dates found in nodes. Please check your column mapping.');
       return;
     }
     
-    // Second pass: collect all nodes with the farthest date
     this.cy.nodes('[sheetNode = "yes"]').forEach((node: any) => {
       const details = node.data("details") || {};
       const rawEnd = details["Target End"] || 
@@ -1093,16 +1074,10 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     });
     
-    console.log('Farthest date:', farthestDate);
-    console.log('Farthest timestamp:', farthestTimestamp);
-    console.log('Farthest nodes:', farthestNodes.map((n: any) => n.data('label')));
-    
     if (farthestNodes.length === 0) {
-      console.log('No farthest nodes found');
       return;
     }
     
-    // Get all nodes in the critical path (working backwards from farthest nodes ONLY)
     const criticalPathNodes = new Set<string>();
     const nodesToProcess = [...farthestNodes];
     
@@ -1116,7 +1091,6 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       
       criticalPathNodes.add(nodeId);
       
-      // Find all edges that point TO this node (incoming edges)
       const incomingEdges = currentNode.incomers('edge[sourceTag = "sheet"]');
       
       incomingEdges.forEach((edge: any) => {
@@ -1127,28 +1101,18 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       });
     }
     
-    console.log('Critical path node count:', criticalPathNodes.size);
-    console.log('Critical path nodes:', Array.from(criticalPathNodes));
-    
-    // Color ONLY edges that are part of the critical path to red
-    let redEdgeCount = 0;
     this.cy.edges('[sourceTag = "sheet"]').forEach((edge: any) => {
       const targetId = edge.data('target');
       const sourceId = edge.data('source');
       
-      // Both source AND target must be in the critical path
       if (criticalPathNodes.has(targetId) && criticalPathNodes.has(sourceId)) {
         edge.style({
           'line-color': 'red',
           'target-arrow-color': 'red',
           'width': 3
         });
-        redEdgeCount++;
-        console.log(`Red edge: ${sourceId} -> ${targetId}`);
       }
     });
-    
-    console.log('Total red edges:', redEdgeCount);
   }
   
   updateNodesFromSheet() {
@@ -1158,17 +1122,14 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
     const labelCol = this.mapping.label;
     const filterCol = this.mapping.filter;
     
-    // Get all existing sheet nodes
     const existingSheetNodes = this.cy.nodes('[sheetNode = "yes"]');
     
-    // Create a map of updated data from sheet
     const updatedDataMap = new Map();
     
     for (const row of this.rows) {
       const cells = row.c;
       if (!cells) continue;
       
-      // Apply filter if exists
       if (filterCol !== null) {
         const filterValue = this.parseSheetValue(cells[filterCol]?.v)?.toString().trim() || "";
         if (filterValue !== this.selectedFilterValue) {
@@ -1181,7 +1142,6 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       
       const nodeLabel = this.parseSheetValue(cells[labelCol]?.v)?.toString() || "";
       
-      // Build details object
       const details: any = {};
       this.headers.forEach((header, index) => {
         if (this.selectedNodeDisplay[index]) {
@@ -1189,12 +1149,9 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         }
       });
       
-      // Determine color based on status
       let nodeColor = "#E3E3E3";
-      const statusValue = details["Status"] ?? details["status"] ?? details["STATUS"];
-      if (statusValue && this.statusColors[statusValue]) {
-        nodeColor = this.statusColors[statusValue];
-      }
+      const statusValue = details["Status"] ?? details["status"] ?? details["STATUS"] ?? details["project_status"];
+      nodeColor = this.getStatusColor(statusValue);
       
       updatedDataMap.set(nodeId, {
         label: nodeLabel,
@@ -1203,57 +1160,69 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       });
     }
     
-    // Update existing nodes with new data
     existingSheetNodes.forEach((node: any) => {
       const nodeId = node.id();
       const updatedData = updatedDataMap.get(nodeId);
       
       if (updatedData) {
-        // Update node data
         node.data('label', updatedData.label);
         node.data('details', updatedData.details);
         
-        // Update display label
         const extra = Object.entries(updatedData.details)
           .map(([k, v]) => `${k}: ${v}`)
           .join("\n");
         const displayLabel = extra ? `${updatedData.label}\n${extra}` : updatedData.label;
         node.data('displayLabel', displayLabel);
         
-        // Update color
         node.style('background-color', updatedData.color);
         
-        // Mark as updated
         updatedDataMap.delete(nodeId);
       }
     });
+  }
+  
+  getStatusColorsList(): Array<{status: string, color: string}> {
+    return Object.entries(this.statusColors).map(([status, color]) => ({
+      status,
+      color: color as string
+    }));
+  }
+  
+  addCustomStatus() {
+    const status = prompt('Enter status name:');
+    if (!status) return;
     
-    // Add any new nodes that don't exist yet (optional)
-    // If you want to add new nodes from the sheet, uncomment this section:
-    /*
-    updatedDataMap.forEach((data, nodeId) => {
-      const extra = Object.entries(data.details)
-        .map(([k, v]) => `${k}: ${v}`)
-        .join("\n");
-      const displayLabel = extra ? `${data.label}\n${extra}` : data.label;
-      
-      this.cy.add({
-        group: "nodes",
-        data: {
-          id: nodeId,
-          label: data.label,
-          displayLabel: displayLabel,
-          details: data.details,
-          sheetNode: "yes"
-        },
-        style: {
-          "background-color": data.color,
-          "border-color": "#1a237e"
-        },
-        position: { x: Math.random() * 600, y: Math.random() * 600 }
-      });
+    const color = prompt('Enter color (hex format, e.g., #FF5733):', '#E3E3E3');
+    if (!color) return;
+    
+    this.statusColors[status] = color;
+    alert(`Status "${status}" added with color ${color}`);
+  }
+  
+  removeCustomStatus(status: string) {
+    if (confirm(`Remove status "${status}"?`)) {
+      delete this.statusColors[status];
+      alert(`Status "${status}" removed`);
+    }
+  }
+  
+  editStatusColor(status: string) {
+    const newColor = prompt(`Enter new color for "${status}" (hex format):`, this.statusColors[status]);
+    if (newColor) {
+      this.statusColors[status] = newColor;
+      alert(`Color for "${status}" updated to ${newColor}`);
+      this.refreshNodeColors();
+    }
+  }
+  
+  refreshNodeColors() {
+    if (!this.cy) return;
+    
+    this.cy.nodes('[sheetNode = "yes"]').forEach((node: any) => {
+      const details = node.data('details') || {};
+      const statusValue = details["Status"] ?? details["status"] ?? details["STATUS"] ?? details["project_status"];
+      node.style('background-color', this.getStatusColor(statusValue));
     });
-    */
   }
   
   hasSavedMapping() {
@@ -1286,7 +1255,13 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
             this.connectionStyle = (this.diagramsField.line_category as any) || this.connectionStyle;
             this.applyConnectionStyle();
             this.cy.fit();
-          }, 50);
+            
+            this.refreshNodeColors();
+            
+            if (this.diagramsField.sheet_url) {
+              this.showCriticalPath();
+            }
+          }, 100);
         } catch (err) {
           console.warn('Invalid saved json_data');
         }
