@@ -627,9 +627,9 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       const match = value.match(/Date\((\d+),(\d+),(\d+)\)/);
       if (match) {
         const year = parseInt(match[1]);
-        const month = parseInt(match[2]);
+        const month = parseInt(match[2]) -1;
         const day = parseInt(match[3]);
-        return new Date(year, month - 1, day);
+        return new Date(year, month , day);
       }
     }
     
@@ -642,13 +642,14 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
     const parts = value.split('/');
     if (parts.length === 3) {
       const [a, b, c] = parts;
-      let month = parseInt(a);
+      let month = parseInt(a) + 1;
       let day = parseInt(b);
       if (month > 12) { 
         month = parseInt(b);
         day = parseInt(a);
       }
-      return new Date(`${month}/${day}/${c}`);
+      debugger;
+      return new Date(`${month}/${day+1}/${c}`);
     }
     return null;
   }
@@ -873,7 +874,7 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       const match = value.match(/Date\((\d+),(\d+),(\d+)\)/);
       if (match) {
         const year = parseInt(match[1]);
-        const month = parseInt(match[2]);
+        const month = parseInt(match[2]) + 1;
         const day = parseInt(match[3]);
         return `${month}/${day}/${year}`;
       }
