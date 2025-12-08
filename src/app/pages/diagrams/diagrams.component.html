@@ -1,16 +1,16 @@
 <div class="flexcol h-full !items-start">
   <div class="toolbar !gap-2 flexrow">
     <button (click)="addNode()" class="bg-primary" title="Add Node">
-      <lucide-icon [img]="WorkflowIcon"></lucide-icon>Nodes
+      <lucide-icon [img]="WorkflowIcon" [size]="15"></lucide-icon>Nodes
     </button>
 
-    <select [(ngModel)]="connectionStyle" (change)="applyConnectionStyle()" class="bg-primary input text-white p-2">
+    <select [(ngModel)]="connectionStyle" (change)="applyConnectionStyle()" class="bg-primary input text-white p-2 text-[12px]">
       <option value="straight">Straight</option>
       <option value="angle">Angle</option>
     </select>
 
     <button (click)="enableConnect()" class="bg-primary" title="Connect">
-      <lucide-icon [img]="GitBranchPlusIcon"></lucide-icon>Connect
+      <lucide-icon [img]="GitBranchPlusIcon" [size]="15"></lucide-icon>Connect
     </button>
 
     <!-- <button (click)="autoLayoutByTargetEnd()" class="bg-primary text-sm" title="Auto Layout">
@@ -18,32 +18,44 @@
     </button> -->
 
     <button (click)="saveLocal()" class="bg-primary" title="Save">
-      <lucide-icon [img]="SaveIcon"></lucide-icon>Save
+      <lucide-icon [img]="SaveIcon" [size]="15"></lucide-icon>Save
     </button>
 
     <button (click)="openSheetImport()" class="bg-primary" title="Import Sheet">
-      <lucide-icon [img]="UploadSheetIcon"></lucide-icon>Upload Sheet
+      <lucide-icon [img]="UploadSheetIcon" [size]="15"></lucide-icon>Upload
     </button>
 
     <button (click)="showMappingModal = true" class="bg-primary" title="Map Columns">
-      <lucide-icon [img]="SelectNodeIcon"></lucide-icon>Map
+      <lucide-icon [img]="SelectNodeIcon" [size]="15"></lucide-icon>Map
     </button>
 
     <button (click)="refreshFromSheet()" class="bg-primary" title="Re-layout">
-      <lucide-icon [img]="RefreshIcon"></lucide-icon>Refresh
+      <lucide-icon [img]="RefreshIcon" [size]="15"></lucide-icon>Refresh
     </button>
     <button (click)="enableLineMode()" class="bg-primary" title="Draw Line">
-      <lucide-icon [img]="SlashIcon"></lucide-icon>Line
+      <lucide-icon [img]="SlashIcon" [size]="15"></lucide-icon>Line
     </button>
     <button (click)="snapHorizontal()" class="bg-primary" title="Draw Line">
-      <lucide-icon [img]="SlashIcon"></lucide-icon>Horizontal
+      <lucide-icon [img]="SlashIcon" [size]="15"></lucide-icon>Horizontal
     </button>
     <button (click)="addLabel()" class="bg-primary" title="Add Label">
-      <lucide-icon [img]="TypeIcon"></lucide-icon>Label
+      <lucide-icon [img]="TypeIcon" [size]="15"></lucide-icon>Label
     </button>
+    <input [(ngModel)]="searchQuery" (keyup.enter)="searchNodes()" class="p-1 border rounded-xl" placeholder="Search nodes...">
+    <button (click)="searchNodes()" class="bg-primary !px-4">Search</button>
+    <button (click)="previousSearchResult()" class="bg-primary"><lucide-icon [img]="PreviousIcon" [size]="15"></lucide-icon></button>
+    <button (click)="nextSearchResult()" class="bg-primary"><lucide-icon [img]="NextIcon" [size]="15"></lucide-icon></button>
+    <button (click)="clearSearch()" class="bg-primary">Clear</button>
   </div>
 
-  <div #cyContainer class="cy border h-full"></div>
+  <div #cyContainer class="cy h-full relative">
+    <div class="bg-black/30 absolute bottom-3 right-3 p-2 py-4 rounded-xl flexcol z-50">
+      <button (click)="zoomIn()" class="p-2 rounded-lg bg-black/50" title="Zoom In"> <lucide-icon [img]="ZoomInIcon" [size]="15"></lucide-icon></button>
+      <button (click)="zoomOut()" class="p-2 rounded-lg bg-black/50" title="Zoom Out"> <lucide-icon [img]="ZoomOutIcon" [size]="15"></lucide-icon></button>
+      <button (click)="resetZoom()" class="p-2 rounded-lg bg-black/50" title="Zoom Reset"> <lucide-icon [img]="ZoomResetIcon" [size]="15"></lucide-icon></button>
+      <button (click)="zoomToFit()" class="p-2 rounded-lg bg-black/50" title="Fit to Screen"> <lucide-icon [img]="ZoomFitIcon" [size]="15"></lucide-icon></button>
+    </div>
+  </div>
 </div>
 
 <div *ngIf="ShowSavingModal" class="modal">

@@ -3,7 +3,31 @@ import { FormsModule } from '@angular/forms';
 import { Component, ElementRef, ViewChild, OnInit, OnDestroy, AfterViewInit } from '@angular/core';
 import cytoscape from 'cytoscape';
 import dagre from 'cytoscape-dagre';
-import { LucideAngularModule, Workflow, Spline, GitBranchPlus, Save, Shapes, RouteOff, Palette, BetweenHorizontalStart, SquareMousePointer, RefreshCcw, Minus, Type, Slash, AlignCenter, AlignHorizontalJustifyCenter, AlignVerticalJustifyCenter } from 'lucide-angular';
+import { 
+  LucideAngularModule, 
+  Workflow, 
+  Spline, 
+  GitBranchPlus, 
+  Save, 
+  Shapes, 
+  RouteOff, 
+  Palette, 
+  BetweenHorizontalStart, 
+  SquareMousePointer, 
+  RefreshCcw, 
+  Minus, 
+  Type, 
+  Slash, 
+  AlignCenter, 
+  AlignHorizontalJustifyCenter, 
+  AlignVerticalJustifyCenter,
+  ZoomIn,
+  ZoomOut,
+  RotateCcwSquare,
+  ReplaceAll,
+  MoveRight,
+  MoveLeft,
+} from 'lucide-angular';
 import { DiagramsService } from '../../Services/diagrams.service';
 import { ColornodesService } from '../../Services/ColorNodes/colornodes.service';
 import { Diagrams } from '../../Models/Diagrams/diagrams.model';
@@ -40,6 +64,17 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly AlignCenterIcon = AlignCenter;
   readonly AlignHorizontalIcon = AlignHorizontalJustifyCenter;
   readonly AlignVerticalIcon = AlignVerticalJustifyCenter;
+  readonly ZoomInIcon = ZoomIn;
+  readonly ZoomOutIcon = ZoomOut;
+  readonly ZoomFitIcon = RotateCcwSquare;
+  readonly ZoomResetIcon = ReplaceAll;
+  readonly NextIcon = MoveRight;
+  readonly PreviousIcon = MoveLeft;
+  // readonly AlignVerticalIcon = AlignVerticalJustifyCenter;
+  
+  searchQuery: string = '';
+  searchResults: any[] = [];
+  currentSearchIndex: number = -1;
   
   @ViewChild('cyContainer') cyContainer!: ElementRef;
   jsonLoaded = false;
@@ -627,9 +662,9 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       const match = value.match(/Date\((\d+),(\d+),(\d+)\)/);
       if (match) {
         const year = parseInt(match[1]);
-        const month = parseInt(match[2]) -1;
+        const month = parseInt(match[2]);
         const day = parseInt(match[3]);
-        return new Date(year, month , day);
+        return new Date(year, month - 1, day);
       }
     }
     
@@ -642,14 +677,13 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
     const parts = value.split('/');
     if (parts.length === 3) {
       const [a, b, c] = parts;
-      let month = parseInt(a) + 1;
+      let month = parseInt(a);
       let day = parseInt(b);
       if (month > 12) { 
         month = parseInt(b);
         day = parseInt(a);
       }
-      debugger;
-      return new Date(`${month}/${day+1}/${c}`);
+      return new Date(`${month}/${day}/${c}`);
     }
     return null;
   }
@@ -870,13 +904,17 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
   }
   
   parseSheetValue(value: any) {
+    console.log('parseSheetValue input:', value, 'type:', typeof value);
+    
     if (typeof value === 'string' && value.startsWith('Date(')) {
       const match = value.match(/Date\((\d+),(\d+),(\d+)\)/);
       if (match) {
         const year = parseInt(match[1]);
-        const month = parseInt(match[2]) + 1;
+        const month = parseInt(match[2]);
         const day = parseInt(match[3]);
-        return `${month}/${day}/${year}`;
+        const result = `${month}/${day}/${year}`;
+        console.log('parseSheetValue Date() format result:', result);
+        return result;
       }
     }
     if (typeof value === 'number') {
@@ -886,13 +924,27 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       const month = (date.getMonth() + 1).toString().padStart(2, '0');
       const day = date.getDate().toString().padStart(2, '0');
       const year = date.getFullYear();
-      return `${month}/${day}/${year}`;
+      const result = `${month}/${day}/${year}`;
+      console.log('parseSheetValue number format result:', result);
+      return result;
     }
-    return value?.toString() ?? '';
+    const result = value?.toString() ?? '';
+    console.log('parseSheetValue default result:', result);
+    return result;
   }
   
   generateNodesDynamic() {
     if (!this.cy) return;
+    
+    // Store existing node positions before removing them
+    const existingPositions = new Map<string, {x: number, y: number}>();
+    this.cy.nodes().filter((n: any) => n.data('sheetNode') === 'yes').forEach((node: any) => {
+      existingPositions.set(node.id(), {
+        x: node.position().x,
+        y: node.position().y
+      });
+    });
+    
     this.cy.nodes().filter((n: any) => n.data('sheetNode') === 'yes').remove();
     this.cy.edges('[sourceTag = "sheet"]').remove();
     const selectedHeaders = this.headers
@@ -938,6 +990,11 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         .map(([k, v]) => `${k}: ${v}`)
         .join("\n");
       const displayLabel = extra ? `${nodeLabel}\n${extra}` : nodeLabel;
+      
+      // Use existing position if available, otherwise use random position
+      const savedPosition = existingPositions.get(nodeId);
+      const position = savedPosition || { x: Math.random() * 600, y: Math.random() * 600 };
+      
       this.cy.add({
         group: "nodes",
         data: {
@@ -951,7 +1008,7 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
           "background-color": nodeColor,
           "border-color": "#1a237e"
         },
-        position: { x: Math.random() * 600, y: Math.random() * 600 }
+        position: position
       });
       
       if (depCol !== null) {
@@ -981,7 +1038,11 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       });
     }
     
-    this.layout();
+    // Only run layout if there are new nodes without saved positions
+    const hasNewNodes = Array.from(existingNodeIds).some(id => !existingPositions.has(id));
+    if (hasNewNodes || existingPositions.size === 0) {
+      this.layout();
+    }
   }
   
   refreshFromSheet() {
@@ -1224,6 +1285,128 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       const statusValue = details["Status"] ?? details["status"] ?? details["STATUS"] ?? details["project_status"];
       node.style('background-color', this.getStatusColor(statusValue));
     });
+  }
+  
+  searchNodes() {
+    if (!this.cy || !this.searchQuery.trim()) {
+      this.clearSearch();
+      return;
+    }
+    
+    this.cy.nodes().removeClass('highlighted');
+    
+    const query = this.searchQuery.toLowerCase().trim();
+    this.searchResults = [];
+    
+    this.cy.nodes('[sheetNode = "yes"]').forEach((node: any) => {
+      const label = (node.data('label') || '').toLowerCase();
+      const details = node.data('details') || {};
+      const detailsText = Object.values(details).join(' ').toLowerCase();
+      
+      if (label.includes(query) || detailsText.includes(query)) {
+        this.searchResults.push(node);
+      }
+    });
+    
+    if (this.searchResults.length > 0) {
+      this.currentSearchIndex = 0;
+      this.highlightSearchResult();
+    } else {
+      alert('No nodes found matching your search.');
+    }
+  }
+  
+  highlightSearchResult() {
+    if (this.searchResults.length === 0) return;
+    
+    this.cy.nodes().removeClass('highlighted');
+    
+    this.searchResults.forEach((node: any, index: number) => {
+      if (index === this.currentSearchIndex) {
+        node.addClass('highlighted');
+        node.style({
+          'border-width': 4,
+          'border-color': '#FF5722'
+        });
+        
+        this.cy.animate({
+          center: {
+            eles: node
+          },
+          zoom: 1.5,
+          duration: 500
+        });
+      } else {
+        node.style({
+          'border-width': 2,
+          'border-color': '#FFA726'
+        });
+      }
+    });
+  }
+  
+  nextSearchResult() {
+    if (this.searchResults.length === 0) return;
+    
+    this.currentSearchIndex = (this.currentSearchIndex + 1) % this.searchResults.length;
+    this.highlightSearchResult();
+  }
+  
+  previousSearchResult() {
+    if (this.searchResults.length === 0) return;
+    
+    this.currentSearchIndex = this.currentSearchIndex - 1;
+    if (this.currentSearchIndex < 0) {
+      this.currentSearchIndex = this.searchResults.length - 1;
+    }
+    this.highlightSearchResult();
+  }
+  
+  clearSearch() {
+    this.searchQuery = '';
+    this.searchResults = [];
+    this.currentSearchIndex = -1;
+    
+    if (this.cy) {
+      this.cy.nodes().removeClass('highlighted');
+      this.cy.nodes('[sheetNode = "yes"]').forEach((node: any) => {
+        node.style({
+          'border-width': 1,
+          'border-color': '#1a237e'
+        });
+      });
+    }
+  }
+  
+  zoomIn() {
+    if (!this.cy) return;
+    const currentZoom = this.cy.zoom();
+    this.cy.animate({
+      zoom: currentZoom * 1.2,
+      duration: 300
+    });
+  }
+  
+  zoomOut() {
+    if (!this.cy) return;
+    const currentZoom = this.cy.zoom();
+    this.cy.animate({
+      zoom: currentZoom * 0.8,
+      duration: 300
+    });
+  }
+  
+  resetZoom() {
+    if (!this.cy) return;
+    this.cy.animate({
+      fit: { padding: 50 },
+      duration: 500
+    });
+  }
+  
+  zoomToFit() {
+    if (!this.cy) return;
+    this.cy.fit(this.cy.nodes('[sheetNode = "yes"]'), 50);
   }
   
   hasSavedMapping() {
