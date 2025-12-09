@@ -70,12 +70,9 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly ZoomResetIcon = ReplaceAll;
   readonly NextIcon = MoveRight;
   readonly PreviousIcon = MoveLeft;
-  // readonly AlignVerticalIcon = AlignVerticalJustifyCenter;
-  
   searchQuery: string = '';
   searchResults: any[] = [];
   currentSearchIndex: number = -1;
-  
   @ViewChild('cyContainer') cyContainer!: ElementRef;
   jsonLoaded = false;
   cy: any;
@@ -1031,7 +1028,7 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       });
     }
     this.showCriticalPath();
-    // Only run layout if there are new nodes without saved positions
+    this.refreshNodeColors();
     const hasNewNodes = Array.from(existingNodeIds).some(id => !existingPositions.has(id));
     if (hasNewNodes || existingPositions.size === 0) {
       this.layout();
@@ -1070,8 +1067,6 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
   
   showCriticalPath() {
   if (!this.cy) return;
-  
-  // Reset all edges to default style
   this.cy.edges('[sourceTag = "sheet"]').forEach((edge: any) => {
     edge.style({
       'line-color': '#333333',
@@ -1079,24 +1074,21 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
       'width': 2
     });
   });
-  
-  // Find the node with the farthest target end date that has dependencies
   let farthestTimestamp: number | null = null;
   let farthestNodeId: string | null = null;
   
   this.cy.nodes('[sheetNode = "yes"]').forEach((node: any) => {
-    // Check if node has incoming dependencies
     const incomingEdges = node.incomers('edge[sourceTag = "sheet"]');
     if (incomingEdges.length === 0) {
-      return; // Skip nodes without dependencies
+      return;
     }
     
     const details = node.data("details") || {};
-    const rawEnd = details["Target End"] || 
-                   details["Target end"] || 
-                   details["target end"] ||
-                   details["TargetEnd"] ||
-                   details["target_end"];
+    const rawEnd = details["Effective Target End"] || 
+                   details["Effective Target end"] || 
+                   details["effective target end"] ||
+                   details["EffectiveTargetEnd"] ||
+                   details["effective_target_end"];
     
     if (rawEnd) {
       const parsed = this.normalizeDate(rawEnd);
@@ -1449,14 +1441,13 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
   }
   autoLayout() {
     if (!this.cy) return;
-    
     const sheetNodes = this.cy.nodes('[sheetNode = "yes"]');
-    
     if (sheetNodes.length === 0) {
       alert('No sheet nodes to layout. Please import data from Google Sheets first.');
       return;
     }
-    
+    const confirmed = confirm('Are you sure you want to auto-layout the nodes?');
+    if (!confirmed) return;
     try {
       this.cy.layout({
         name: 'dagre',
