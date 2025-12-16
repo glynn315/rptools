@@ -223,19 +223,23 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         {
           selector: 'node[nodeType = "lineAnchor"]',
           style: {
-            'width': 5,
-            'height': 5,
+            'width': 2,
+            'height': 2,
             'background-color': '#333333',
+            'line-dash-pattern': [6, 4],
             'border-width': 0,
             'opacity': 0.5
           }
         },
+        
         {
-          selector: 'edge[lineType = "drawn"]',
+          selector: 'edge[lineType = "dashed"]',
           style: {
             'curve-style': 'straight',
             'line-color': '#333333',
-            'width': 1,
+            'line-style': 'dashed',
+            'line-dash-pattern': [10, 5],
+            'width': 3,
             'target-arrow-shape': 'none'
           }
         }
@@ -446,7 +450,7 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         id: edgeId,
         source: startNodeId,
         target: endNodeId,
-        lineType: 'drawn'
+        lineType: 'dashed'
       },
       selectable: false
     });
@@ -980,8 +984,6 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         .map(([k, v]) => `${k}: ${v}`)
         .join("\n");
       const displayLabel = extra ? `${nodeLabel}\n${extra}` : nodeLabel;
-      
-      // Use existing position if available, otherwise use random position
       const savedPosition = existingPositions.get(nodeId);
       const position = savedPosition || { x: Math.random() * 600, y: Math.random() * 600 };
       
@@ -1027,7 +1029,9 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         }
       });
     }
+    
     this.showCriticalPath();
+    this.highlightFarthestNodes();
     this.refreshNodeColors();
     const hasNewNodes = Array.from(existingNodeIds).some(id => !existingPositions.has(id));
     if (hasNewNodes || existingPositions.size === 0) {
@@ -1054,15 +1058,204 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         this.headers = json.table.cols.map((c: any) => c.label || 'Column');
         this.rows = json.table.rows || [];
         
-        this.updateNodesFromSheet();
-        this.showCriticalPath();
+        // Save all current positions before refresh
+        const allPositions = new Map<string, {x: number, y: number}>();
+        this.cy.nodes('[sheetNode = "yes"]').forEach((node: any) => {
+          allPositions.set(node.id(), {
+            x: node.position().x,
+            y: node.position().y
+          });
+        });
+        this.refreshNodesFromSheet(allPositions);
         
-        alert('Data refreshed and critical path highlighted!');
+        alert('Data refreshed with new rows, updated dependencies and critical path highlighted!');
       })
       .catch(err => {
         console.error(err);
         alert('Failed to refresh sheet data.');
       });
+  }
+  
+  refreshNodesFromSheet(existingPositions: Map<string, {x: number, y: number}>) {
+    if (!this.cy) return;
+    this.cy.edges('[sourceTag = "sheet"]').remove();
+    
+    const selectedHeaders = this.headers
+      .filter((_, i) => this.selectedNodeDisplay[i])
+      .map(h => h.trim());
+    
+    const idCol = this.mapping.id;
+    const labelCol = this.mapping.label;
+    const depCol = this.mapping.dependency;
+    const filterCol = this.mapping.filter;
+    
+    const processedNodeIds = new Set<string>();
+    const nodeDependencies: Array<{nodeId: string, dependencies: string[]}> = [];
+    
+    // Process all rows from sheet
+    for (const row of this.rows) {
+      const cells = row.c;
+      if (!cells) continue;
+      
+      if (filterCol !== null) {
+        const filterValue = this.parseSheetValue(cells[filterCol]?.v)?.toString().trim() || "";
+        if (filterValue !== this.selectedFilterValue) {
+          continue;
+        }
+      }
+      
+      const nodeId = this.parseSheetValue(cells[idCol]?.v)?.toString() || "";
+      const nodeLabel = this.parseSheetValue(cells[labelCol]?.v)?.toString() || "";
+      if (!nodeId) continue;
+      
+      processedNodeIds.add(nodeId);
+      
+      const details: any = {};
+      this.headers.forEach((header, index) => {
+        if (this.selectedNodeDisplay[index]) {
+          details[header] = this.parseSheetValue(cells[index]?.v);
+        }
+      });
+      
+      let nodeColor = "#E3E3E3";
+      const statusValue = details["Status"] ?? details["status"] ?? details["STATUS"] ?? details["project_status"] ?? details["Project Status"];
+      nodeColor = this.getStatusColor(statusValue);
+      
+      const extra = Object.entries(details)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join("\n");
+      const displayLabel = extra ? `${nodeLabel}\n${extra}` : nodeLabel;
+      
+      // Check if node exists
+      const existingNode = this.cy.$id(nodeId);
+      
+      if (existingNode.length > 0) {
+        // Update existing node
+        existingNode.data('label', nodeLabel);
+        existingNode.data('details', details);
+        existingNode.data('displayLabel', displayLabel);
+        existingNode.style('background-color', nodeColor);
+      } else {
+        // Create new node
+        const savedPosition = existingPositions.get(nodeId);
+        const position = savedPosition || { 
+          x: 200 + Math.random() * 400, 
+          y: 200 + Math.random() * 400 
+        };
+        
+        this.cy.add({
+          group: "nodes",
+          data: {
+            id: nodeId,
+            label: nodeLabel,
+            displayLabel,
+            details,
+            sheetNode: "yes"
+          },
+          style: {
+            "background-color": nodeColor,
+            "border-color": "#1a237e"
+          },
+          position: position
+        });
+      }
+      
+      // Collect dependencies
+      if (depCol !== null) {
+        const depRaw = this.parseSheetValue(cells[depCol]?.v)?.toString() || "";
+        const dependencies = depRaw.split(",").map((v: string) => v.trim()).filter((v: string | any[]) => v.length > 0);
+        if (dependencies.length > 0) {
+          nodeDependencies.push({ nodeId, dependencies });
+        }
+      }
+    }
+    
+    // Remove nodes that no longer exist in the sheet
+    this.cy.nodes('[sheetNode = "yes"]').forEach((node: any) => {
+      if (!processedNodeIds.has(node.id())) {
+        this.cy.remove(node);
+      }
+    });
+    
+    // Recreate all dependencies
+    for (const { nodeId, dependencies } of nodeDependencies) {
+      dependencies.forEach((dep: any) => {
+        const targetNode = this.cy.$id(nodeId);
+        const sourceNode = this.cy.$id(dep);
+        
+        if (targetNode.length > 0 && sourceNode.length > 0) {
+          this.cy.add({
+            group: "edges",
+            data: {
+              id: `edge-${dep}-${nodeId}-${Math.random()}`,
+              source: dep,
+              target: nodeId,
+              sourceTag: "sheet"
+            },
+            style: this.getConnectionStyle()
+          });
+        }
+      });
+    }
+    this.highlightFarthestNodes();
+    this.showCriticalPath();
+    this.refreshNodeColors();
+  }
+
+  recreateDependencies() {
+    if (!this.cy || !this.rows.length) return;
+    
+    const idCol = this.mapping.id;
+    const depCol = this.mapping.dependency;
+    const filterCol = this.mapping.filter;
+    
+    if (depCol === null) return;
+    
+    // Build dependency map from sheet data
+    const nodeDependencies: Array<{nodeId: string, dependencies: string[]}> = [];
+    
+    for (const row of this.rows) {
+      const cells = row.c;
+      if (!cells) continue;
+      
+      if (filterCol !== null) {
+        const filterValue = this.parseSheetValue(cells[filterCol]?.v)?.toString().trim() || "";
+        if (filterValue !== this.selectedFilterValue) {
+          continue;
+        }
+      }
+      
+      const nodeId = this.parseSheetValue(cells[idCol]?.v)?.toString() || "";
+      if (!nodeId) continue;
+      
+      const depRaw = this.parseSheetValue(cells[depCol]?.v)?.toString() || "";
+      const dependencies = depRaw.split(",").map((v: string) => v.trim()).filter((v: string | any[]) => v.length > 0);
+      
+      if (dependencies.length > 0) {
+        nodeDependencies.push({ nodeId, dependencies });
+      }
+    }
+    
+    // Create edges for all dependencies
+    for (const { nodeId, dependencies } of nodeDependencies) {
+      dependencies.forEach((dep: any) => {
+        const targetNode = this.cy.$id(nodeId);
+        const sourceNode = this.cy.$id(dep);
+        
+        if (targetNode.length > 0 && sourceNode.length > 0) {
+          this.cy.add({
+            group: "edges",
+            data: {
+              id: `edge-${dep}-${nodeId}-${Math.random()}`,
+              source: dep,
+              target: nodeId,
+              sourceTag: "sheet"
+            },
+            style: this.getConnectionStyle()
+          });
+        }
+      });
+    }
   }
   
   showCriticalPath() {
@@ -1164,6 +1357,53 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
         });
       }
     });
+  }
+  
+  highlightFarthestNodes() {
+    if (!this.cy) return;
+    this.cy.nodes('[sheetNode = "yes"]').forEach((node: any) => {
+      node.style({
+        'border-width': 1,
+        'border-color': '#1a237e'
+      });
+    });
+    let farthestTimestamp: number | null = null;
+    const farthestNodeIds: string[] = [];
+    this.cy.nodes('[sheetNode = "yes"]').forEach((node: any) => {
+      const details = node.data("details") || {};
+      const rawEnd = details["Effective Target End"] || 
+                    details["Effective Target end"] || 
+                    details["effective target end"] ||
+                    details["EffectiveTargetEnd"] ||
+                    details["effective_target_end"];
+      
+      if (rawEnd) {
+        const parsed = this.normalizeDate(rawEnd);
+        
+        if (parsed && !isNaN(parsed.getTime())) {
+          const timestamp = parsed.getTime();
+          
+          if (farthestTimestamp === null || timestamp > farthestTimestamp) {
+            farthestTimestamp = timestamp;
+            farthestNodeIds.length = 0;
+            farthestNodeIds.push(node.id());
+          } else if (timestamp === farthestTimestamp) {
+            farthestNodeIds.push(node.id());
+          }
+        }
+      }
+    });
+    if (farthestNodeIds.length > 0) {
+      farthestNodeIds.forEach(nodeId => {
+        const node = this.cy.$id(nodeId);
+        if (node.length > 0) {
+          node.style({
+            'border-width': 4,
+            'border-color': '#FF0000'
+          });
+        }
+      });
+    }
   }
   
   updateNodesFromSheet() {
@@ -1432,6 +1672,7 @@ export class DiagramComponent implements OnInit, AfterViewInit, OnDestroy {
             this.refreshNodeColors();
             
             if (this.diagramsField.sheet_url) {
+              this.highlightFarthestNodes();
               this.showCriticalPath();
             }
           }, 100);
